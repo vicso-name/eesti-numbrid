@@ -15,32 +15,35 @@ const NUMBERS = [
   {n:8, et:'kaheksa', ru:'восемь', ord:'kaheksas', ordRu:'восьмой'},
   {n:9, et:'üheksa', ru:'девять', ord:'üheksas', ordRu:'девятый'},
   {n:10, et:'kümme', ru:'десять', ord:'kümnes', ordRu:'десятый'},
-  {n:11, et:'üksteist', ru:'одиннадцать'},
-  {n:12, et:'kaksteist', ru:'двенадцать'},
-  {n:13, et:'kolmteist', ru:'тринадцать'},
-  {n:14, et:'neliteist', ru:'четырнадцать'},
-  {n:15, et:'viisteist', ru:'пятнадцать'},
-  {n:16, et:'kuusteist', ru:'шестнадцать'},
-  {n:17, et:'seitseteist', ru:'семнадцать'},
-  {n:18, et:'kaheksateist', ru:'восемнадцать'},
-  {n:19, et:'üheksateist', ru:'девятнадцать'},
-  {n:20, et:'kakskümmend', ru:'двадцать'},
-  {n:30, et:'kolmkümmend', ru:'тридцать'},
-  {n:40, et:'nelikümmend', ru:'сорок'},
-  {n:50, et:'viiskümmend', ru:'пятьдесят'},
-  {n:60, et:'kuuskümmend', ru:'шестьдесят'},
-  {n:70, et:'seitsekümmend', ru:'семьдесят'},
-  {n:80, et:'kaheksakümmend', ru:'восемьдесят'},
-  {n:90, et:'üheksakümmend', ru:'девяносто'},
-  {n:100, et:'sada', ru:'сто'},
+  {n:11, et:'üksteist', ru:'одиннадцать', ord:'üheteistkümnes', ordRu:'одиннадцатый'},
+  {n:12, et:'kaksteist', ru:'двенадцать', ord:'kaheteistkümnes', ordRu:'двенадцатый'},
+  {n:13, et:'kolmteist', ru:'тринадцать', ord:'kolmeteistkümnes', ordRu:'тринадцатый'},
+  {n:14, et:'neliteist', ru:'четырнадцать', ord:'neljateistkümnes', ordRu:'четырнадцатый'},
+  {n:15, et:'viisteist', ru:'пятнадцать', ord:'viieteistkümnes', ordRu:'пятнадцатый'},
+  {n:16, et:'kuusteist', ru:'шестнадцать', ord:'kuueteistkümnes', ordRu:'шестнадцатый'},
+  {n:17, et:'seitseteist', ru:'семнадцать', ord:'seitsmeteistkümnes', ordRu:'семнадцатый'},
+  {n:18, et:'kaheksateist', ru:'восемнадцать', ord:'kaheksateistkümnes', ordRu:'восемнадцатый'},
+  {n:19, et:'üheksateist', ru:'девятнадцать', ord:'üheksateistkümnes', ordRu:'девятнадцатый'},
+  {n:20, et:'kakskümmend', ru:'двадцать', ord:'kahekümnes', ordRu:'двадцатый'},
+  {n:30, et:'kolmkümmend', ru:'тридцать', ord:'kolmekümnes', ordRu:'тридцатый'},
+  {n:40, et:'nelikümmend', ru:'сорок', ord:'neljakümnes', ordRu:'сороковой'},
+  {n:50, et:'viiskümmend', ru:'пятьдесят', ord:'viiekümnes', ordRu:'пятидесятый'},
+  {n:60, et:'kuuskümmend', ru:'шестьдесят', ord:'kuuekümnes', ordRu:'шестидесятый'},
+  {n:70, et:'seitsekümmend', ru:'семьдесят', ord:'seitsmekümnes', ordRu:'семидесятый'},
+  {n:80, et:'kaheksakümmend', ru:'восемьдесят', ord:'kaheksakümnes', ordRu:'восьмидесятый'},
+  {n:90, et:'üheksakümmend', ru:'девяносто', ord:'üheksakümnes', ordRu:'девяностый'},
+  {n:100, et:'sada', ru:'сто', ord:'sajas', ordRu:'сотый'},
 ];
 
-// Nouns for sentences (nominative sg, partitive sg, Russian, Russian partitive)
+// Nouns for sentences
+// ruOne: "одно яблоко" (nom with correct gender of один)
+// ruGen: genitive sg for 2-4 ("два яблока")
+// ruGenPl: genitive pl for 5+ ("пять яблок")
 const NOUNS = [
-  {nom:'õun', part:'õuna', ru:'яблоко', ruPart:'яблок'},
-  {nom:'raamat', part:'raamatut', ru:'книга', ruPart:'книг'},
-  {nom:'koer', part:'koera', ru:'собака', ruPart:'собак'},
-  {nom:'kass', part:'kassi', ru:'кошка', ruPart:'кошек'},
+  {nom:'õun', part:'õuna', ruOne:'одно яблоко', ruGen:'яблока', ruGenPl:'яблок'},
+  {nom:'raamat', part:'raamatut', ruOne:'одна книга', ruGen:'книги', ruGenPl:'книг'},
+  {nom:'koer', part:'koera', ruOne:'одна собака', ruGen:'собаки', ruGenPl:'собак'},
+  {nom:'kass', part:'kassi', ruOne:'одна кошка', ruGen:'кошки', ruGenPl:'кошек'},
 ];
 
 const SAVE_KEY = 'numbrid_save';
@@ -89,12 +92,22 @@ function stopAudio(){if(currentAudio){currentAudio.pause();currentAudio=null;}}
 
 // ── SENTENCE BUILDER ──
 function makeSentence(num, noun) {
-  // üks õun (nominative), kaks õuna (partitive for 2+)
+  // Estonian: üks õun (nominative), kaks õuna (partitive for 2+)
   const nounForm = num.n === 1 ? noun.nom : noun.part;
   const et = `Mul on ${num.et} ${nounForm}`;
-  const ru = num.n === 1
-    ? `У меня ${num.ru} ${noun.ru}`
-    : `У меня ${num.ru} ${noun.ruPart}`;
+
+  // Russian: proper number agreement
+  // 1 → "одно яблоко" (special per-noun form)
+  // 2-4 → genitive singular "два яблока"
+  // 5-19 → genitive plural "пять яблок"
+  let ru;
+  if (num.n === 1) {
+    ru = `У меня ${noun.ruOne}`;
+  } else if (num.n >= 2 && num.n <= 4) {
+    ru = `У меня ${num.ru} ${noun.ruGen}`;
+  } else {
+    ru = `У меня ${num.ru} ${noun.ruGenPl}`;
+  }
   return { et, ru, words: ['Mul', 'on', num.et, nounForm] };
 }
 
@@ -733,21 +746,35 @@ function renderHeatmap(containerId){
   });
   html+=`</div>`;
 
-  // 11-19 compact
-  html+=`<div style="margin-top:10px;font-size:.72rem;font-weight:700;color:var(--text-dim);">11–19:</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">`;
+  // 11-19 grid (card + ord + sent)
+  html+=`<div style="margin-top:12px;font-size:.72rem;font-weight:700;color:var(--text-dim);margin-bottom:6px;">11–19:</div>
+    <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;">
+    <div></div><div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Число</div>
+    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Поряд.</div>
+    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Предл.</div>`;
   nums11to19().forEach(num=>{
-    const s=getSkillStrength(skillState[`n${num.n}_card`]);
-    html+=`<div style="padding:4px 8px;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-family:'DM Mono',monospace;font-size:.7rem;font-weight:600;">${num.n}</div>`;
+    const cs=getSkillStrength(skillState[`n${num.n}_card`]);
+    const os=getSkillStrength(skillState[`n${num.n}_ord`]);
+    const ss=getSkillStrength(skillState[`n${num.n}_sent`]);
+    html+=`<div style="padding:4px 6px;font-weight:700;font-size:.75rem;">${num.n}</div>`;
+    [cs,os,ss].forEach(s=>{
+      html+=`<div style="padding:4px;text-align:center;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-weight:700;font-size:.72rem;">${s>=0?s:'—'}</div>`;
+    });
   });
   html+=`</div>`;
 
-  // Tens
-  html+=`<div style="margin-top:10px;font-size:.72rem;font-weight:700;color:var(--text-dim);">Десятки:</div>
-    <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">`;
+  // Tens grid (card + ord)
+  html+=`<div style="margin-top:12px;font-size:.72rem;font-weight:700;color:var(--text-dim);margin-bottom:6px;">Десятки:</div>
+    <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;">
+    <div></div><div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Число</div>
+    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Поряд.</div>`;
   numsTens().forEach(num=>{
-    const s=getSkillStrength(skillState[`n${num.n}_card`]);
-    html+=`<div style="padding:4px 8px;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-family:'DM Mono',monospace;font-size:.7rem;font-weight:600;">${num.n}</div>`;
+    const cs=getSkillStrength(skillState[`n${num.n}_card`]);
+    const os=getSkillStrength(skillState[`n${num.n}_ord`]);
+    html+=`<div style="padding:4px 6px;font-weight:700;font-size:.75rem;">${num.n}</div>`;
+    [cs,os].forEach(s=>{
+      html+=`<div style="padding:4px;text-align:center;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-weight:700;font-size:.72rem;">${s>=0?s:'—'}</div>`;
+    });
   });
   html+=`</div>`;
 
@@ -772,9 +799,162 @@ function injectHeatmapContainers(){
 }
 function refreshHeatmaps(){injectHeatmapContainers();renderHeatmap('startHeatmap');renderHeatmap('resultHeatmap');}
 
+// ═══════════════════════════════════════════
+// ── STUDY MODE (interactive reference cards)
+// ═══════════════════════════════════════════
+
+function renderStudy() {
+  const c = $('studyContent');
+  c.innerHTML = '';
+
+  // ── TAB BAR ──
+  const tabs = [
+    { id: 'tab1', label: '1–10' },
+    { id: 'tab2', label: '11–19' },
+    { id: 'tab3', label: '20–100' },
+    { id: 'tab4', label: '💬' },
+  ];
+
+  const tabBar = document.createElement('div');
+  tabBar.style.cssText = 'display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
+
+  const panels = {};
+
+  tabs.forEach((tab, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'study-tab';
+    btn.textContent = tab.label;
+    btn.dataset.tab = tab.id;
+    if (i === 0) btn.classList.add('active');
+    btn.addEventListener('click', () => {
+      stopAudio();
+      tabBar.querySelectorAll('.study-tab').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      Object.values(panels).forEach(p => p.style.display = 'none');
+      panels[tab.id].style.display = '';
+    });
+    tabBar.appendChild(btn);
+
+    const panel = document.createElement('div');
+    panel.style.display = i === 0 ? '' : 'none';
+    panels[tab.id] = panel;
+  });
+
+  c.appendChild(tabBar);
+  Object.values(panels).forEach(p => c.appendChild(p));
+
+  // Helper: create a number card
+  function makeCard(num, showOrd) {
+    const card = document.createElement('div');
+    card.className = 'study-card';
+    card.innerHTML = `
+      <div class="sc-num">${num.n}</div>
+      <div class="sc-et">${num.et}</div>
+      <div class="sc-ru">${num.ru}</div>
+      ${showOrd && num.ord ? `<div class="sc-ord">${num.ord} (${num.ordRu})</div>` : ''}
+    `;
+    card.addEventListener('click', () => {
+      c.querySelectorAll('.study-card.playing, .study-sentence.playing').forEach(el => el.classList.remove('playing'));
+      card.classList.add('playing');
+      playAudio(num.et).then(() => card.classList.remove('playing'));
+    });
+    return card;
+  }
+
+  // Helper: create a sentence row
+  function makeSentenceRow(num, noun) {
+    const s = makeSentence(num, noun);
+    const row = document.createElement('div');
+    row.className = 'study-sentence';
+    row.innerHTML = `<span class="ss-et">${s.et}</span><span class="ss-ru">${s.ru}</span>`;
+    row.addEventListener('click', () => {
+      c.querySelectorAll('.study-card.playing, .study-sentence.playing').forEach(el => el.classList.remove('playing'));
+      row.classList.add('playing');
+      playAudio(s.et).then(() => row.classList.remove('playing'));
+    });
+    return row;
+  }
+
+  // ── TAB 1: 1–10 ──
+  const p1 = panels['tab1'];
+  const grid1 = document.createElement('div');
+  grid1.className = 'study-grid';
+  nums1to10().forEach(num => grid1.appendChild(makeCard(num, true)));
+  p1.appendChild(grid1);
+
+  const note1 = document.createElement('div');
+  note1.className = 'study-note';
+  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)<br>
+    Образуются по-разному — нужно запоминать каждое.`;
+  p1.appendChild(note1);
+
+  // ── TAB 2: 11–19 ──
+  const p2 = panels['tab2'];
+  const grid2 = document.createElement('div');
+  grid2.className = 'study-grid';
+  nums11to19().forEach(num => grid2.appendChild(makeCard(num, true)));
+  p2.appendChild(grid2);
+
+  const note2 = document.createElement('div');
+  note2.className = 'study-note';
+  note2.innerHTML = `<strong>Количественные:</strong> корень + <strong>teist</strong><br>
+    üks → üks<strong>teist</strong>, kaks → kaks<strong>teist</strong><br><br>
+    <strong>Порядковые:</strong> корень + <strong>teistkümnes</strong><br>
+    ühe<strong>teistkümnes</strong>, kahe<strong>teistkümnes</strong>... (обрати внимание — корень меняется!)`;
+  p2.appendChild(note2);
+
+  // ── TAB 3: 20–100 ──
+  const p3 = panels['tab3'];
+  const grid3 = document.createElement('div');
+  grid3.className = 'study-grid';
+  numsTens().forEach(num => grid3.appendChild(makeCard(num, true)));
+  p3.appendChild(grid3);
+
+  const note3 = document.createElement('div');
+  note3.className = 'study-note';
+  note3.innerHTML = `<strong>Количественные:</strong> корень + <strong>kümmend</strong><br>
+    kaks<strong>kümmend</strong>, kolm<strong>kümmend</strong>...<br><br>
+    <strong>Порядковые:</strong> корень + <strong>kümnes</strong><br>
+    kahe<strong>kümnes</strong>, kolme<strong>kümnes</strong>...<br>
+    Исключение: 100 = <strong>sada</strong> → <strong>sajas</strong>`;
+  p3.appendChild(note3);
+
+  // ── TAB 4: Sentences ──
+  const p4 = panels['tab4'];
+
+  const note4top = document.createElement('div');
+  note4top.className = 'study-note';
+  note4top.innerHTML = `<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass)<br>
+    После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)<br>
+    Как в русском: "одна книга" vs "пять книг"`;
+  p4.appendChild(note4top);
+
+  const sentWrap = document.createElement('div');
+  sentWrap.className = 'study-sentence-grid';
+  const examples = [
+    { num: getNum(1), noun: NOUNS[0] },
+    { num: getNum(3), noun: NOUNS[0] },
+    { num: getNum(1), noun: NOUNS[2] },
+    { num: getNum(5), noun: NOUNS[2] },
+    { num: getNum(1), noun: NOUNS[1] },
+    { num: getNum(7), noun: NOUNS[1] },
+    { num: getNum(1), noun: NOUNS[3] },
+    { num: getNum(12), noun: NOUNS[3] },
+  ];
+  examples.forEach(({ num, noun }) => sentWrap.appendChild(makeSentenceRow(num, noun)));
+  p4.appendChild(sentWrap);
+}
+
+function openStudy() {
+  renderStudy();
+  showScr('studyScreen');
+}
+
 // ── EVENTS ──
 function bindEvents(){
   $('startBtn').addEventListener('click',()=>startGame(false));
+  $('studyBtn').addEventListener('click', openStudy);
+  $('studyBackBtn').addEventListener('click', () => { stopAudio(); showScr('startScreen'); });
   $('pauseBtn').addEventListener('click',openPauseModal);
   $('resumeBtn').addEventListener('click',closePauseModal);
   $('restartBtn').addEventListener('click',restartFromPause);
@@ -784,7 +964,11 @@ function bindEvents(){
   $('nextBtn').addEventListener('click',nextQ);
   $('pauseModal').addEventListener('click',e=>{if(e.target.id==='pauseModal')closePauseModal();});
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){if($('pauseModal').classList.contains('show'))closePauseModal();else if($('gameScreen').classList.contains('active'))openPauseModal();}
+    if(e.key==='Escape'){
+      if($('pauseModal').classList.contains('show'))closePauseModal();
+      else if($('studyScreen').classList.contains('active')){stopAudio();showScr('startScreen');}
+      else if($('gameScreen').classList.contains('active'))openPauseModal();
+    }
     if(e.key==='Enter'&&$('nextBtn').style.display==='block')nextQ();
   });
 }

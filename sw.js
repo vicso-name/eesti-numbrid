@@ -6,11 +6,17 @@ const nums = [
   {n:1,et:'üks',ord:'esimene'},{n:2,et:'kaks',ord:'teine'},{n:3,et:'kolm',ord:'kolmas'},
   {n:4,et:'neli',ord:'neljas'},{n:5,et:'viis',ord:'viies'},{n:6,et:'kuus',ord:'kuues'},
   {n:7,et:'seitse',ord:'seitsmes'},{n:8,et:'kaheksa',ord:'kaheksas'},{n:9,et:'üheksa',ord:'üheksas'},
-  {n:10,et:'kümme',ord:'kümnes'},{n:11,et:'üksteist'},{n:12,et:'kaksteist'},{n:13,et:'kolmteist'},
-  {n:14,et:'neliteist'},{n:15,et:'viisteist'},{n:16,et:'kuusteist'},{n:17,et:'seitseteist'},
-  {n:18,et:'kaheksateist'},{n:19,et:'üheksateist'},{n:20,et:'kakskümmend'},{n:30,et:'kolmkümmend'},
-  {n:40,et:'nelikümmend'},{n:50,et:'viiskümmend'},{n:60,et:'kuuskümmend'},{n:70,et:'seitsekümmend'},
-  {n:80,et:'kaheksakümmend'},{n:90,et:'üheksakümmend'},{n:100,et:'sada'}
+  {n:10,et:'kümme',ord:'kümnes'},
+  {n:11,et:'üksteist',ord:'üheteistkümnes'},{n:12,et:'kaksteist',ord:'kaheteistkümnes'},
+  {n:13,et:'kolmteist',ord:'kolmeteistkümnes'},{n:14,et:'neliteist',ord:'neljateistkümnes'},
+  {n:15,et:'viisteist',ord:'viieteistkümnes'},{n:16,et:'kuusteist',ord:'kuueteistkümnes'},
+  {n:17,et:'seitseteist',ord:'seitsmeteistkümnes'},{n:18,et:'kaheksateist',ord:'kaheksateistkümnes'},
+  {n:19,et:'üheksateist',ord:'üheksateistkümnes'},
+  {n:20,et:'kakskümmend',ord:'kahekümnes'},{n:30,et:'kolmkümmend',ord:'kolmekümnes'},
+  {n:40,et:'nelikümmend',ord:'neljakümnes'},{n:50,et:'viiskümmend',ord:'viiekümnes'},
+  {n:60,et:'kuuskümmend',ord:'kuuekümnes'},{n:70,et:'seitsekümmend',ord:'seitsmekümnes'},
+  {n:80,et:'kaheksakümmend',ord:'kaheksakümnes'},{n:90,et:'üheksakümmend',ord:'üheksakümnes'},
+  {n:100,et:'sada',ord:'sajas'}
 ];
 const nouns = [{nom:'õun',part:'õuna'},{nom:'raamat',part:'raamatut'},{nom:'koer',part:'koera'},{nom:'kass',part:'kassi'}];
 
