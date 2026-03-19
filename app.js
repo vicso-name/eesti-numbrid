@@ -803,6 +803,141 @@ function injectHeatmapContainers(){
 function refreshHeatmaps(){injectHeatmapContainers();renderHeatmap('startHeatmap');renderHeatmap('resultHeatmap');}
 
 // ═══════════════════════════════════════════
+// ── LOOK-HIDE-WRITE DRILL (Testing Effect)
+// ═══════════════════════════════════════════
+
+let drillTimer = null;
+
+function openDrill(word, audioText, label, sublabel) {
+  stopAudio();
+  const overlay = $('drillOverlay');
+  const phase = $('drillPhase');
+  overlay.classList.add('show');
+
+  let correctInRow = 0;
+  const NEEDED = 2;
+
+  showPhase();
+
+  function showPhase() {
+    const showTime = correctInRow === 0 ? 4000 : 3000;
+
+    phase.innerHTML = `
+      <div class="drill-num">${label}</div>
+      <div class="drill-ru">${sublabel}</div>
+      <div class="drill-hint">Запоминай написание:</div>
+      <div class="drill-word pulse">${word}</div>
+      <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
+      <div class="drill-streak-dots">
+        ${Array.from({length: NEEDED}, (_, i) =>
+          `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
+        ).join('')}
+      </div>
+      <div style="font-size:.75rem;color:var(--text-dim);font-family:'DM Mono',monospace;">
+        ${correctInRow > 0 ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}!` : `Напиши правильно ${NEEDED} раза подряд`}
+      </div>
+    `;
+
+    playAudio(audioText);
+
+    const fill = $('drillTimerFill');
+    if (fill) {
+      fill.style.width = '100%';
+      fill.style.transitionDuration = showTime + 'ms';
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { fill.style.width = '0%'; });
+      });
+    }
+
+    drillTimer = setTimeout(() => writePhase(), showTime);
+  }
+
+  function writePhase() {
+    phase.innerHTML = `
+      <div class="drill-num">${label}</div>
+      <div class="drill-ru">${sublabel}</div>
+      <div class="drill-hint">Напиши по памяти:</div>
+      <div class="drill-streak-dots">
+        ${Array.from({length: NEEDED}, (_, i) =>
+          `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
+        ).join('')}
+      </div>
+      <div style="margin-top:12px;">
+        <input type="text" class="drill-input" id="drillInput" placeholder="..." autocomplete="off" spellcheck="false" />
+      </div>
+    `;
+
+    const inp = $('drillInput');
+    setTimeout(() => inp.focus(), 100);
+
+    function check() {
+      const val = normalize(inp.value);
+      if (!val) return;
+
+      const ok = val === normalize(word);
+      inp.disabled = true;
+
+      if (ok) {
+        inp.classList.add('correct');
+        correctInRow++;
+
+        if (correctInRow >= NEEDED) {
+          setTimeout(() => successPhase(), 500);
+        } else {
+          setTimeout(() => showPhase(), 800);
+        }
+      } else {
+        inp.classList.add('wrong');
+        correctInRow = 0;
+
+        setTimeout(() => {
+          phase.innerHTML = `
+            <div class="drill-num">${label}</div>
+            <div class="drill-hint" style="color:var(--danger);">Не совсем. Правильно:</div>
+            <div class="drill-word">${word}</div>
+            <div class="drill-streak-dots">
+              ${Array.from({length: NEEDED}, () =>
+                `<div class="drill-streak-dot"></div>`
+              ).join('')}
+            </div>
+            <div style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Смотри внимательно...</div>
+          `;
+          playAudio(audioText);
+          drillTimer = setTimeout(() => showPhase(), 3000);
+        }, 600);
+      }
+    }
+
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
+  }
+
+  function successPhase() {
+    playAudio(audioText);
+    phase.innerHTML = `
+      <div class="drill-num">${label}</div>
+      <div class="drill-success">✓ Запомнил!</div>
+      <div class="drill-word" style="color:var(--success);">${word}</div>
+      <div class="drill-streak-dots">
+        ${Array.from({length: NEEDED}, () =>
+          `<div class="drill-streak-dot filled"></div>`
+        ).join('')}
+      </div>
+      <div style="margin-top:16px;">
+        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">Отлично!</button>
+      </div>
+    `;
+    $('drillDoneBtn').addEventListener('click', closeDrill);
+  }
+}
+
+function closeDrill() {
+  if (drillTimer) { clearTimeout(drillTimer); drillTimer = null; }
+  stopAudio();
+  $('drillOverlay').classList.remove('show');
+  $('drillPhase').innerHTML = '';
+}
+
+// ═══════════════════════════════════════════
 // ── STUDY MODE (interactive reference cards)
 // ═══════════════════════════════════════════
 
@@ -857,10 +992,14 @@ function renderStudy() {
       ${showOrd && num.ord ? `<div class="sc-ord">${num.ord} (${num.ordRu})</div>` : ''}
     `;
     card.addEventListener('click', () => {
-      c.querySelectorAll('.study-card.playing, .study-sentence.playing').forEach(el => el.classList.remove('playing'));
-      card.classList.add('playing');
-      playAudio(num.et).then(() => card.classList.remove('playing'));
+      openDrill(num.et, num.et, String(num.n), num.ru);
     });
+    if (showOrd && num.ord) {
+      card.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        openDrill(num.ord, num.ord, `${num.n}-й`, num.ordRu);
+      });
+    }
     return card;
   }
 
@@ -871,9 +1010,7 @@ function renderStudy() {
     row.className = 'study-sentence';
     row.innerHTML = `<span class="ss-et">${s.et}</span><span class="ss-ru">${s.ru}</span>`;
     row.addEventListener('click', () => {
-      c.querySelectorAll('.study-card.playing, .study-sentence.playing').forEach(el => el.classList.remove('playing'));
-      row.classList.add('playing');
-      playAudio(s.et).then(() => row.classList.remove('playing'));
+      openDrill(s.et, s.et, s.ru, '');
     });
     return row;
   }
@@ -958,6 +1095,8 @@ function bindEvents(){
   $('startBtn').addEventListener('click',()=>startGame(false));
   $('studyBtn').addEventListener('click', openStudy);
   $('studyBackBtn').addEventListener('click', () => { stopAudio(); showScr('startScreen'); });
+  $('drillClose').addEventListener('click', closeDrill);
+  $('drillOverlay').addEventListener('click', e => { if (e.target.id === 'drillOverlay') closeDrill(); });
   $('pauseBtn').addEventListener('click',openPauseModal);
   $('resumeBtn').addEventListener('click',closePauseModal);
   $('restartBtn').addEventListener('click',restartFromPause);
@@ -968,7 +1107,8 @@ function bindEvents(){
   $('pauseModal').addEventListener('click',e=>{if(e.target.id==='pauseModal')closePauseModal();});
   document.addEventListener('keydown',e=>{
     if(e.key==='Escape'){
-      if($('pauseModal').classList.contains('show'))closePauseModal();
+      if($('drillOverlay').classList.contains('show'))closeDrill();
+      else if($('pauseModal').classList.contains('show'))closePauseModal();
       else if($('studyScreen').classList.contains('active')){stopAudio();showScr('startScreen');}
       else if($('gameScreen').classList.contains('active'))openPauseModal();
     }
