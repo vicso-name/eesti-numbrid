@@ -136,13 +136,16 @@ body{
 .study-sentence .ss-ru{font-size:.78rem;color:var(--text-dim);text-align:right;flex-shrink:0;}
 .drill-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px;z-index:60;background:rgba(5,8,13,.75);backdrop-filter:blur(14px);}
 .drill-overlay.show{display:flex}
-.drill-card{width:min(100%,400px);padding:28px 22px;border-radius:28px;text-align:center;position:relative;}
-.drill-close{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-dim);font-size:1.5rem;cursor:pointer;padding:4px 8px;line-height:1;}
+.drill-card{width:min(100%,440px);padding:28px 22px;border-radius:28px;text-align:center;position:relative;overflow:hidden;}
+.drill-close{position:absolute;top:14px;right:14px;background:none;border:none;color:var(--text-dim);font-size:1.5rem;cursor:pointer;padding:4px 8px;line-height:1;z-index:2;}
 .drill-close:hover{color:var(--text);}
-.drill-word{font-size:2.2rem;font-weight:900;color:var(--accent);font-family:'DM Mono',monospace;margin:16px 0;letter-spacing:.02em;line-height:1.3;}
+.drill-sequence{display:inline-flex;align-items:center;justify-content:center;padding:6px 10px;border-radius:999px;margin-bottom:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);font-size:.72rem;font-weight:800;font-family:'DM Mono',monospace;color:var(--text-dim);}
+.drill-kind{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);font-weight:800;margin-bottom:10px;}
+.drill-word{font-size:clamp(1.55rem, 6vw, 2.45rem);font-weight:900;color:var(--accent);font-family:'DM Mono',monospace;margin:16px 0;letter-spacing:.02em;line-height:1.25;overflow-wrap:anywhere;word-break:break-word;padding-inline:6px;max-width:100%;}
 .drill-hint{font-size:1rem;color:var(--text-dim);margin-bottom:12px;}
-.drill-num{font-size:3rem;font-weight:900;color:var(--text);margin-bottom:4px;}
-.drill-ru{font-size:.9rem;color:var(--text-dim);margin-bottom:8px;}
+.drill-num{font-size:clamp(2.2rem, 10vw, 3.2rem);font-weight:900;color:var(--text);margin-bottom:4px;line-height:1.05;}
+.drill-ru{font-size:.9rem;color:var(--text-dim);margin-bottom:8px;line-height:1.4;min-height:1.2em;}
+.drill-meta{font-size:.78rem;color:var(--text-dim);margin-top:8px;font-family:'DM Mono',monospace;line-height:1.5;}
 .drill-timer{width:100%;height:5px;border-radius:99px;background:rgba(255,255,255,.08);margin:16px 0;overflow:hidden;}
 .drill-timer-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width linear;}
 .drill-input{width:100%;padding:16px;background:rgba(255,255,255,.05);border:2px solid rgba(255,255,255,.1);border-radius:16px;color:var(--text);font-family:'DM Mono',monospace;font-size:1.1rem;text-align:center;outline:none;transition:border-color .2s,background .2s;}
@@ -159,3 +162,4 @@ body{
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 .animate-in{animation:fadeInUp .34s cubic-bezier(.22,1,.36,1)}.shake{animation:shake .34s ease}
 @media(max-width:420px){.container{padding:14px 12px 20px}.stats{gap:6px}.stat-card{padding:10px 6px}.q-text{font-size:1.12rem}.option-btn,.typing-input,.typing-submit,.build-submit,.next-btn{font-size:.97rem}}
+@media(max-width:420px){.drill-card{padding:24px 16px}.drill-word{font-size:1.45rem}.drill-num{font-size:2.05rem}.drill-input{font-size:1rem;padding:14px}}

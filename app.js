@@ -808,37 +808,60 @@ function refreshHeatmaps(){injectHeatmapContainers();renderHeatmap('startHeatmap
 
 let drillTimer = null;
 
-function openDrill(word, audioText, label, sublabel) {
+function openDrill(wordOrItems, audioText, label, sublabel) {
   stopAudio();
+  if (drillTimer) { clearTimeout(drillTimer); drillTimer = null; }
+
   const overlay = $('drillOverlay');
   const phase = $('drillPhase');
   overlay.classList.add('show');
 
+  const items = Array.isArray(wordOrItems)
+    ? wordOrItems.map(item => ({ ...item }))
+    : [{ word: wordOrItems, audioText, label, sublabel, kindLabel: 'Слово' }];
+
+  let currentIndex = 0;
   let correctInRow = 0;
   const NEEDED = 2;
+
+  function currentItem() {
+    return items[currentIndex];
+  }
+
+  function progressMeta() {
+    if (items.length <= 1) return '';
+    return `<div class="drill-sequence">${currentIndex + 1} / ${items.length}</div>`;
+  }
+
+  function streakMeta() {
+    return correctInRow > 0
+      ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}`
+      : `Напиши правильно ${NEEDED} раза подряд`;
+  }
 
   showPhase();
 
   function showPhase() {
+    const item = currentItem();
     const showTime = correctInRow === 0 ? 4000 : 3000;
 
     phase.innerHTML = `
-      <div class="drill-num">${label}</div>
-      <div class="drill-ru">${sublabel}</div>
+      ${progressMeta()}
+      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
+      <div class="drill-num">${item.label || ''}</div>
+      <div class="drill-ru">${item.sublabel || ''}</div>
       <div class="drill-hint">Запоминай написание:</div>
-      <div class="drill-word pulse">${word}</div>
+      <div class="drill-word pulse">${item.word}</div>
       <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
           `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
         ).join('')}
       </div>
-      <div style="font-size:.75rem;color:var(--text-dim);font-family:'DM Mono',monospace;">
-        ${correctInRow > 0 ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}!` : `Напиши правильно ${NEEDED} раза подряд`}
-      </div>
+      <div class="drill-meta">${streakMeta()}</div>
     `;
 
-    playAudio(audioText);
+    playAudio(item.audioText || item.word);
 
     const fill = $('drillTimerFill');
     if (fill) {
@@ -853,29 +876,40 @@ function openDrill(word, audioText, label, sublabel) {
   }
 
   function writePhase() {
+    const item = currentItem();
+
     phase.innerHTML = `
-      <div class="drill-num">${label}</div>
-      <div class="drill-ru">${sublabel}</div>
+      ${progressMeta()}
+      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
+      <div class="drill-num">${item.label || ''}</div>
+      <div class="drill-ru">${item.sublabel || ''}</div>
       <div class="drill-hint">Напиши по памяти:</div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
           `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
         ).join('')}
       </div>
-      <div style="margin-top:12px;">
-        <input type="text" class="drill-input" id="drillInput" placeholder="..." autocomplete="off" spellcheck="false" />
+      <div style="margin-top:12px;display:grid;gap:10px;">
+        <input type="text" class="drill-input" id="drillInput" placeholder="Напиши слово..." autocomplete="off" spellcheck="false" />
+        <button class="btn btn-primary" id="drillCheckBtn" style="padding:14px 18px;">Проверить</button>
       </div>
+      <div class="drill-meta" id="drillMetaText">${streakMeta()}</div>
     `;
 
     const inp = $('drillInput');
+    const checkBtn = $('drillCheckBtn');
     setTimeout(() => inp.focus(), 100);
 
     function check() {
       const val = normalize(inp.value);
-      if (!val) return;
+      if (!val) {
+        showToast('Сначала введи слово');
+        return;
+      }
 
-      const ok = val === normalize(word);
+      const ok = val === normalize(item.word);
       inp.disabled = true;
+      checkBtn.disabled = true;
 
       if (ok) {
         inp.classList.add('correct');
@@ -892,41 +926,58 @@ function openDrill(word, audioText, label, sublabel) {
 
         setTimeout(() => {
           phase.innerHTML = `
-            <div class="drill-num">${label}</div>
+            ${progressMeta()}
+            <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
+            <div class="drill-num">${item.label || ''}</div>
             <div class="drill-hint" style="color:var(--danger);">Не совсем. Правильно:</div>
-            <div class="drill-word">${word}</div>
+            <div class="drill-word">${item.word}</div>
             <div class="drill-streak-dots">
               ${Array.from({length: NEEDED}, () =>
                 `<div class="drill-streak-dot"></div>`
               ).join('')}
             </div>
-            <div style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Смотри внимательно...</div>
+            <div class="drill-meta">Серия сброшена. Смотри внимательно и попробуй снова.</div>
           `;
-          playAudio(audioText);
+          playAudio(item.audioText || item.word);
           drillTimer = setTimeout(() => showPhase(), 3000);
         }, 600);
       }
     }
 
+    checkBtn.addEventListener('click', check);
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
   }
 
   function successPhase() {
-    playAudio(audioText);
+    const item = currentItem();
+    playAudio(item.audioText || item.word);
+
+    const isLast = currentIndex >= items.length - 1;
     phase.innerHTML = `
-      <div class="drill-num">${label}</div>
+      ${progressMeta()}
+      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
+      <div class="drill-num">${item.label || ''}</div>
       <div class="drill-success">✓ Запомнил!</div>
-      <div class="drill-word" style="color:var(--success);">${word}</div>
+      <div class="drill-word" style="color:var(--success);">${item.word}</div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, () =>
           `<div class="drill-streak-dot filled"></div>`
         ).join('')}
       </div>
       <div style="margin-top:16px;">
-        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">Отлично!</button>
+        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">${isLast ? 'Отлично!' : 'Дальше'}</button>
       </div>
     `;
-    $('drillDoneBtn').addEventListener('click', closeDrill);
+
+    $('drillDoneBtn').addEventListener('click', () => {
+      if (isLast) {
+        closeDrill();
+        return;
+      }
+      currentIndex++;
+      correctInRow = 0;
+      showPhase();
+    });
   }
 }
 
@@ -992,12 +1043,36 @@ function renderStudy() {
       ${showOrd && num.ord ? `<div class="sc-ord">${num.ord} (${num.ordRu})</div>` : ''}
     `;
     card.addEventListener('click', () => {
-      openDrill(num.et, num.et, String(num.n), num.ru);
+      const items = [{
+        word: num.et,
+        audioText: num.et,
+        label: String(num.n),
+        sublabel: num.ru,
+        kindLabel: 'Количественное числительное'
+      }];
+
+      if (showOrd && num.ord) {
+        items.push({
+          word: num.ord,
+          audioText: num.ord,
+          label: `${num.n}-й`,
+          sublabel: num.ordRu,
+          kindLabel: 'Порядковое числительное'
+        });
+      }
+
+      openDrill(items);
     });
     if (showOrd && num.ord) {
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        openDrill(num.ord, num.ord, `${num.n}-й`, num.ordRu);
+        openDrill([{
+          word: num.ord,
+          audioText: num.ord,
+          label: `${num.n}-й`,
+          sublabel: num.ordRu,
+          kindLabel: 'Порядковое числительное'
+        }]);
       });
     }
     return card;
