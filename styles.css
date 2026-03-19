@@ -22,22 +22,11 @@
 html,body{height:100%}
 body{
   font-family:'Inter',system-ui,sans-serif;
-  background:
-    radial-gradient(circle at top left, rgba(6,214,160,.15), transparent 34%),
-    radial-gradient(circle at top right, rgba(14,165,233,.10), transparent 28%),
-    linear-gradient(180deg, #0b1320 0%, #080d14 100%);
+  background: #0b1320;
   color:var(--text);min-height:100dvh;overflow-x:hidden;
 }
-body::before{
-  content:'';position:fixed;inset:0;
-  background:
-    linear-gradient(rgba(255,255,255,.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
-  background-size:28px 28px;
-  mask-image:linear-gradient(180deg, rgba(0,0,0,.4), transparent 90%);
-  pointer-events:none;opacity:.2;
-}
-.container{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:18px 14px 24px;min-height:100dvh;display:flex;flex-direction:column;}
+
+.container{position:relative;z-index:1;max-width:var(--maxw);margin:0 auto;padding:24px 14px 18px;min-height:100dvh;display:flex;flex-direction:column;}
 .screen{display:none;flex-direction:column;min-height:100dvh}.screen.active{display:flex}
 #studyScreen.active{min-height:auto;padding-bottom:40px;}
 .card{background:var(--surface);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--border);box-shadow:var(--shadow);}

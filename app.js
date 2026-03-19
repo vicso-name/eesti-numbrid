@@ -40,10 +40,10 @@ const NUMBERS = [
 // ruGen: genitive sg for 2-4 ("два яблока")
 // ruGenPl: genitive pl for 5+ ("пять яблок")
 const NOUNS = [
-  {nom:'õun', part:'õuna', ruOne:'одно яблоко', ruGen:'яблока', ruGenPl:'яблок'},
-  {nom:'raamat', part:'raamatut', ruOne:'одна книга', ruGen:'книги', ruGenPl:'книг'},
-  {nom:'koer', part:'koera', ruOne:'одна собака', ruGen:'собаки', ruGenPl:'собак'},
-  {nom:'kass', part:'kassi', ruOne:'одна кошка', ruGen:'кошки', ruGenPl:'кошек'},
+  {nom:'õun', part:'õuna', gender:'n', ruOne:'одно яблоко', ruGen:'яблока', ruGenPl:'яблок'},
+  {nom:'raamat', part:'raamatut', gender:'f', ruOne:'одна книга', ruGen:'книги', ruGenPl:'книг'},
+  {nom:'koer', part:'koera', gender:'f', ruOne:'одна собака', ruGen:'собаки', ruGenPl:'собак'},
+  {nom:'kass', part:'kassi', gender:'f', ruOne:'одна кошка', ruGen:'кошки', ruGenPl:'кошек'},
 ];
 
 const SAVE_KEY = 'numbrid_save';
@@ -90,24 +90,27 @@ function playAudio(text){
 }
 function stopAudio(){if(currentAudio){currentAudio.pause();currentAudio=null;}}
 
+function getRuNumeral(num, noun) {
+  if (num.n === 2) {
+    return noun.gender === 'f' ? 'две' : 'два';
+  }
+  return num.ru;
+}
+
 // ── SENTENCE BUILDER ──
 function makeSentence(num, noun) {
-  // Estonian: üks õun (nominative), kaks õuna (partitive for 2+)
   const nounForm = num.n === 1 ? noun.nom : noun.part;
   const et = `Mul on ${num.et} ${nounForm}`;
 
-  // Russian: proper number agreement
-  // 1 → "одно яблоко" (special per-noun form)
-  // 2-4 → genitive singular "два яблока"
-  // 5-19 → genitive plural "пять яблок"
   let ru;
   if (num.n === 1) {
     ru = `У меня ${noun.ruOne}`;
   } else if (num.n >= 2 && num.n <= 4) {
-    ru = `У меня ${num.ru} ${noun.ruGen}`;
+    ru = `У меня ${getRuNumeral(num, noun)} ${noun.ruGen}`;
   } else {
     ru = `У меня ${num.ru} ${noun.ruGenPl}`;
   }
+
   return { et, ru, words: ['Mul', 'on', num.et, nounForm] };
 }
 
