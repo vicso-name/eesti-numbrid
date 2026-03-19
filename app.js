@@ -844,6 +844,7 @@ function openDrill(wordOrItems, audioText, label, sublabel) {
   function showPhase() {
     const item = currentItem();
     const showTime = correctInRow === 0 ? 4000 : 3000;
+    
 
     phase.innerHTML = `
       ${progressMeta()}
@@ -851,7 +852,7 @@ function openDrill(wordOrItems, audioText, label, sublabel) {
       <div class="drill-num">${item.label || ''}</div>
       <div class="drill-ru">${item.sublabel || ''}</div>
       <div class="drill-hint">Запоминай написание:</div>
-      <div class="drill-word pulse">${item.word}</div>
+      <div class="drill-word">${item.word}</div>
       <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
@@ -889,7 +890,7 @@ function openDrill(wordOrItems, audioText, label, sublabel) {
           `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
         ).join('')}
       </div>
-      <div style="margin-top:12px;display:grid;gap:10px;">
+      <div style="margin-top:12px;display:grid;gap:18px;">
         <input type="text" class="drill-input" id="drillInput" placeholder="Напиши слово..." autocomplete="off" spellcheck="false" />
         <button class="btn btn-primary" id="drillCheckBtn" style="padding:14px 18px;">Проверить</button>
       </div>
@@ -1099,8 +1100,7 @@ function renderStudy() {
 
   const note1 = document.createElement('div');
   note1.className = 'study-note';
-  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)<br>
-    Образуются по-разному — нужно запоминать каждое.`;
+  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й) Образуются по-разному — нужно запоминать каждое.`;
   p1.appendChild(note1);
 
   // ── TAB 2: 11–19 ──
