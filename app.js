@@ -51,6 +51,17 @@ const TOTAL = 50;
 const UP = 2;
 const MAXLVL = 2;
 
+const SESSION_PACKS = [
+  { id:'all', label:'Все', nums: NUMBERS.map(x=>x.n), note:'Полная смешанная сессия' },
+  { id:'1-5', label:'1–5', nums:[1,2,3,4,5], note:'Первые пять чисел и их формы' },
+  { id:'6-10', label:'6–10', nums:[6,7,8,9,10], note:'Вторая пятёрка и порядковые' },
+  { id:'11-20', label:'11–20', nums:[11,12,13,14,15,16,17,18,19,20], note:'Подростковые числа и двадцать' },
+  { id:'30-100', label:'30–100', nums:[30,40,50,60,70,80,90,100], note:'Десятки и сто' },
+];
+
+let activePackId = 'all';
+let sessionTotal = TOTAL;
+
 // ── HELPERS ──
 function $(id){return document.getElementById(id);}
 function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
@@ -70,6 +81,22 @@ function numsTens(){return NUMBERS.filter(x=>x.n>=20);}
 function numsWithOrd(){return NUMBERS.filter(x=>!!x.ord);}
 // Numbers suitable for sentences (1-19)
 function numsSentence(){return NUMBERS.filter(x=>x.n>=1&&x.n<=19);}
+function getPack(id){return SESSION_PACKS.find(x=>x.id===id)||SESSION_PACKS[0];}
+function getActiveNumbers(){const allowed=new Set(getPack(activePackId).nums);return NUMBERS.filter(x=>allowed.has(x.n));}
+function getActiveNumbersWithOrd(){return getActiveNumbers().filter(x=>!!x.ord);}
+function getActiveSentenceNumbers(){return getActiveNumbers().filter(x=>x.n>=1&&x.n<=19);}
+function getActiveSkillEntries(){
+  const allowed=new Set(getPack(activePackId).nums);
+  return Object.entries(skillState).filter(([key])=>{
+    const parsed=parseSkillKey(key);
+    return parsed&&allowed.has(parsed.num.n);
+  });
+}
+function calcSessionTotal(){
+  const skillCount=getActiveSkillEntries().length||getPack(activePackId).nums.length;
+  return Math.max(12, Math.min(TOTAL, Math.round(skillCount*1.35)));
+}
+function getPackLabel(id=activePackId){return getPack(id).label;}
 
 // ── AUDIO ──
 function getAudioFile(text){
@@ -136,7 +163,7 @@ function initSkills(){
 }
 
 function saveProgress(){
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({skillState,correct,wrong,best,total:correct+wrong,ts:Date.now()}));}catch(e){}
+  try{localStorage.setItem(SAVE_KEY,JSON.stringify({skillState,correct,wrong,best,total:correct+wrong,ts:Date.now(),activePackId}));}catch(e){}
 }
 function loadProgress(){
   try{
@@ -179,7 +206,7 @@ function checkSaved(){
 // ── PICK SKILL (SM-2 aware) ──
 function pickSkill(){
   const now=Date.now();
-  const entries=Object.entries(skillState);
+  const entries=getActiveSkillEntries();
   const fresh=entries.filter(([_,s])=>s.reps===0&&s.lastReview===0);
   const overdue=entries.filter(([_,s])=>s.lastReview>0&&s.nextReview<=now).sort((a,b)=>a[1].nextReview-b[1].nextReview);
   const upcoming=entries.filter(([_,s])=>s.lastReview>0&&s.nextReview>now).sort((a,b)=>a[1].nextReview-b[1].nextReview);
@@ -204,21 +231,27 @@ function parseSkillKey(key){
 
 // Choice: number → word
 function makeChoiceNumToWord(num,key){
-  const wrongs=shuffle(NUMBERS.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et);
+  const pool=getActiveNumbers();
+  const fallback=pool.length>1?pool:NUMBERS;
+  const wrongs=shuffle(fallback.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et);
   return{type:'choice',label:'Как будет по-эстонски?',qText:`${num.n}`,qRu:`${num.ru}`,
     answer:num.et,options:shuffle([num.et,...wrongs]),reveal:num.et,_skillKey:key};
 }
 
 // Choice: word → number
 function makeChoiceWordToNum(num,key){
-  const wrongs=shuffle(NUMBERS.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n));
+  const pool=getActiveNumbers();
+  const fallback=pool.length>1?pool:NUMBERS;
+  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n));
   return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',
     answer:String(num.n),options:shuffle([String(num.n),...wrongs]),reveal:`${num.et} = ${num.n}`,_skillKey:key};
 }
 
 // Choice: ordinal
 function makeChoiceOrdinal(num,key){
-  const wrongs=shuffle(numsWithOrd().filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord);
+  const pool=getActiveNumbersWithOrd();
+  const fallback=pool.length>1?pool:numsWithOrd();
+  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord);
   return{type:'choice',label:'Порядковое числительное',qText:`${num.n}-й (${num.ordRu})`,qRu:'',
     answer:num.ord,options:shuffle([num.ord,...wrongs]),reveal:`${num.ordRu} = ${num.ord}`,_skillKey:key};
 }
@@ -227,7 +260,9 @@ function makeChoiceOrdinal(num,key){
 function makeChoiceSentence(num,key){
   const noun=pick(NOUNS);
   const s=makeSentence(num,noun);
-  const wrongs=shuffle(numsSentence().filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.et);
+  const pool=getActiveSentenceNumbers();
+  const fallback=pool.length>1?pool:numsSentence();
+  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.et);
   const nounForm=num.n===1?noun.nom:noun.part;
   return{type:'choice',label:'Вставь число',qText:`Mul on ___ ${nounForm}`,qRu:s.ru,
     answer:num.et,options:shuffle([num.et,...wrongs]),reveal:s.et,_skillKey:key};
@@ -238,7 +273,7 @@ function makeBuildSentence(num,key){
   const noun=pick(NOUNS);
   const s=makeSentence(num,noun);
   const distractors=[];
-  const extra=pick(NUMBERS.filter(x=>x.n!==num.n));
+  const extra=pick(getActiveNumbers().filter(x=>x.n!==num.n).length?getActiveNumbers().filter(x=>x.n!==num.n):NUMBERS.filter(x=>x.n!==num.n));
   if(extra)distractors.push(extra.et);
   const wrongNoun=pick(NOUNS.filter(x=>x.nom!==noun.nom));
   if(wrongNoun)distractors.push(num.n===1?wrongNoun.nom:wrongNoun.part);
@@ -259,13 +294,13 @@ function makeBuildNumber(num,key){
     chunks=[word.slice(0,mid),word.slice(mid)];
   }
   // Add distractor chunks
-  const other=pick(NUMBERS.filter(x=>x.et!==num.et&&x.et.length>3));
+  const other=pick(getActiveNumbers().filter(x=>x.et!==num.et&&x.et.length>3).length?getActiveNumbers().filter(x=>x.et!==num.et&&x.et.length>3):NUMBERS.filter(x=>x.et!==num.et&&x.et.length>3));
   const otherChunks=other?[other.et.slice(0,Math.ceil(other.et.length/2))]:[];
   // Actually, for build let's use sentence building as it's more useful
   // Fall back to sentence
   const noun=pick(NOUNS);
   const s=makeSentence(num,noun);
-  const extra=pick(NUMBERS.filter(x=>x.n!==num.n));
+  const extra=pick(getActiveNumbers().filter(x=>x.n!==num.n).length?getActiveNumbers().filter(x=>x.n!==num.n):NUMBERS.filter(x=>x.n!==num.n));
   const distractors=[extra?extra.et:'null'].filter(x=>x!=='null');
   return{type:'build',label:'Собери предложение',qRu:s.ru,answer:s.words,
     bank:shuffle([...s.words,...distractors]),reveal:s.et,_skillKey:key};
@@ -313,7 +348,7 @@ function makeDictationSentence(num,key){
 // ── EXERCISE ROUTING ──
 function makeExForSkill(skillKey){
   const parsed=parseSkillKey(skillKey);
-  if(!parsed)return makeChoiceNumToWord(pick(NUMBERS),skillKey);
+  if(!parsed)return makeChoiceNumToWord(pick(getActiveNumbers().length?getActiveNumbers():NUMBERS),skillKey);
   const{num,form}=parsed;
   const roll=Math.random();
 
@@ -356,10 +391,13 @@ function startGame(resume=false){
   if(resume&&hasSave()){
     const d=loadProgress();
     skillState=d.skillState;correct=d.correct||0;wrong=d.wrong||0;best=d.best||0;
+    activePackId=d.activePackId||activePackId||'all';
   }else{
     initSkills();correct=0;wrong=0;best=0;
   }
   streak=0;qNum=0;ans=false;curEx=null;
+  sessionTotal=calcSessionTotal();
+  renderPackSelector();
   $('resultBarFill').style.width='0%';
   closePauseModal();
   showScr('gameScreen');
@@ -367,7 +405,7 @@ function startGame(resume=false){
 }
 
 function nextQ(){
-  if(qNum>=TOTAL){showResults();return;}
+  if(qNum>=sessionTotal){showResults();return;}
   const sk=pickSkill();
   if(!sk){showResults();return;}
   curEx=makeExForSkill(sk);
@@ -543,7 +581,7 @@ function proc(ok){
 
   const sentence=curEx.reveal||curEx.audioSentence||'';
   const nextBtn=$('nextBtn');
-  nextBtn.textContent=qNum>=TOTAL?'Результаты':'Далее';
+  nextBtn.textContent=qNum>=sessionTotal?'Результаты':'Далее';
   if(sentence){
     showReplayBtn(sentence);
     setTimeout(()=>{playAudio(sentence).then(()=>{nextBtn.style.display='block';});},300);
@@ -554,21 +592,49 @@ function proc(ok){
 function updStats(){
   const answered=correct+wrong;
   const accuracy=answered?Math.round((correct/answered)*100):0;
-  const pct=Math.round((qNum/TOTAL)*100);
+  const pct=sessionTotal?Math.round((qNum/sessionTotal)*100):0;
   $('correctCount').textContent=correct;
   $('wrongCount').textContent=wrong;
   $('streakCount').textContent=streak;
   $('accuracyCount').textContent=`${accuracy}%`;
-  $('progressTitle').textContent=`Вопрос ${Math.min(qNum,TOTAL)} из ${TOTAL}`;
-  $('progressText').textContent=`${Math.min(qNum,TOTAL)} / ${TOTAL}`;
+  $('progressTitle').textContent=`Вопрос ${Math.min(qNum,sessionTotal)} из ${sessionTotal}`;
+  $('progressText').textContent=`${Math.min(qNum,sessionTotal)} / ${sessionTotal}`;
   $('progressPercent').textContent=`${pct}%`;
   $('progressFill').style.width=`${pct}%`;
   const now=Date.now();
   const due=Object.values(skillState).filter(s=>s.lastReview>0&&s.nextReview<=now).length;
   const mastered=Object.values(skillState).filter(s=>s.done).length;
   const totalSkills=Object.keys(skillState).length;
-  $('sessionMeta').textContent=`Освоено: ${mastered}/${totalSkills} · На повторение: ${due}`;
+  $('sessionMeta').textContent=`Пакет: ${getPackLabel()} · Освоено: ${mastered}/${totalSkills} · На повторение: ${due}`;
   renderXpBar();
+}
+
+function renderPackSelector(){
+  let host=$('sessionPackTabs');
+  if(!host){
+    host=document.createElement('div');
+    host.id='sessionPackTabs';
+    host.className='session-pack-tabs';
+    const header=document.querySelector('#gameScreen .header');
+    if(header)header.insertAdjacentElement('afterend', host);
+  }
+  host.innerHTML='';
+  SESSION_PACKS.forEach(pack=>{
+    const btn=document.createElement('button');
+    btn.className='study-tab session-pack-tab'+(pack.id===activePackId?' active':'');
+    btn.type='button';
+    btn.textContent=pack.label;
+    btn.title=pack.note||'';
+    btn.addEventListener('click',()=>{
+      if(pack.id===activePackId)return;
+      activePackId=pack.id;
+      sessionTotal=calcSessionTotal();
+      renderPackSelector();
+      showToast(`Пакет: ${pack.label}`);
+      startGame(false);
+    });
+    host.appendChild(btn);
+  });
 }
 
 // ── PAUSE ──
@@ -808,61 +874,37 @@ function refreshHeatmaps(){injectHeatmapContainers();renderHeatmap('startHeatmap
 
 let drillTimer = null;
 
-function openDrill(wordOrItems, audioText, label, sublabel) {
+function openDrill(word, audioText, label, sublabel) {
   stopAudio();
-  if (drillTimer) { clearTimeout(drillTimer); drillTimer = null; }
-
   const overlay = $('drillOverlay');
   const phase = $('drillPhase');
   overlay.classList.add('show');
 
-  const items = Array.isArray(wordOrItems)
-    ? wordOrItems.map(item => ({ ...item }))
-    : [{ word: wordOrItems, audioText, label, sublabel, kindLabel: 'Слово' }];
-
-  let currentIndex = 0;
   let correctInRow = 0;
   const NEEDED = 2;
-
-  function currentItem() {
-    return items[currentIndex];
-  }
-
-  function progressMeta() {
-    if (items.length <= 1) return '';
-    return `<div class="drill-sequence">${currentIndex + 1} / ${items.length}</div>`;
-  }
-
-  function streakMeta() {
-    return correctInRow > 0
-      ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}`
-      : `Напиши правильно ${NEEDED} раза подряд`;
-  }
 
   showPhase();
 
   function showPhase() {
-    const item = currentItem();
     const showTime = correctInRow === 0 ? 4000 : 3000;
-    
 
     phase.innerHTML = `
-      ${progressMeta()}
-      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
-      <div class="drill-num">${item.label || ''}</div>
-      <div class="drill-ru">${item.sublabel || ''}</div>
+      <div class="drill-num">${label}</div>
+      <div class="drill-ru">${sublabel}</div>
       <div class="drill-hint">Запоминай написание:</div>
-      <div class="drill-word">${item.word}</div>
+      <div class="drill-word pulse">${word}</div>
       <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
           `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
         ).join('')}
       </div>
-      <div class="drill-meta">${streakMeta()}</div>
+      <div style="font-size:.75rem;color:var(--text-dim);font-family:'DM Mono',monospace;">
+        ${correctInRow > 0 ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}!` : `Напиши правильно ${NEEDED} раза подряд`}
+      </div>
     `;
 
-    playAudio(item.audioText || item.word);
+    playAudio(audioText);
 
     const fill = $('drillTimerFill');
     if (fill) {
@@ -877,40 +919,29 @@ function openDrill(wordOrItems, audioText, label, sublabel) {
   }
 
   function writePhase() {
-    const item = currentItem();
-
     phase.innerHTML = `
-      ${progressMeta()}
-      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
-      <div class="drill-num">${item.label || ''}</div>
-      <div class="drill-ru">${item.sublabel || ''}</div>
+      <div class="drill-num">${label}</div>
+      <div class="drill-ru">${sublabel}</div>
       <div class="drill-hint">Напиши по памяти:</div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
           `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
         ).join('')}
       </div>
-      <div style="margin-top:12px;display:grid;gap:18px;">
-        <input type="text" class="drill-input" id="drillInput" placeholder="Напиши слово..." autocomplete="off" spellcheck="false" />
-        <button class="btn btn-primary" id="drillCheckBtn" style="padding:14px 18px;">Проверить</button>
+      <div style="margin-top:12px;">
+        <input type="text" class="drill-input" id="drillInput" placeholder="..." autocomplete="off" spellcheck="false" />
       </div>
-      <div class="drill-meta" id="drillMetaText">${streakMeta()}</div>
     `;
 
     const inp = $('drillInput');
-    const checkBtn = $('drillCheckBtn');
     setTimeout(() => inp.focus(), 100);
 
     function check() {
       const val = normalize(inp.value);
-      if (!val) {
-        showToast('Сначала введи слово');
-        return;
-      }
+      if (!val) return;
 
-      const ok = val === normalize(item.word);
+      const ok = val === normalize(word);
       inp.disabled = true;
-      checkBtn.disabled = true;
 
       if (ok) {
         inp.classList.add('correct');
@@ -927,58 +958,41 @@ function openDrill(wordOrItems, audioText, label, sublabel) {
 
         setTimeout(() => {
           phase.innerHTML = `
-            ${progressMeta()}
-            <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
-            <div class="drill-num">${item.label || ''}</div>
+            <div class="drill-num">${label}</div>
             <div class="drill-hint" style="color:var(--danger);">Не совсем. Правильно:</div>
-            <div class="drill-word">${item.word}</div>
+            <div class="drill-word">${word}</div>
             <div class="drill-streak-dots">
               ${Array.from({length: NEEDED}, () =>
                 `<div class="drill-streak-dot"></div>`
               ).join('')}
             </div>
-            <div class="drill-meta">Серия сброшена. Смотри внимательно и попробуй снова.</div>
+            <div style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Смотри внимательно...</div>
           `;
-          playAudio(item.audioText || item.word);
+          playAudio(audioText);
           drillTimer = setTimeout(() => showPhase(), 3000);
         }, 600);
       }
     }
 
-    checkBtn.addEventListener('click', check);
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
   }
 
   function successPhase() {
-    const item = currentItem();
-    playAudio(item.audioText || item.word);
-
-    const isLast = currentIndex >= items.length - 1;
+    playAudio(audioText);
     phase.innerHTML = `
-      ${progressMeta()}
-      <div class="drill-kind">${item.kindLabel || 'Слово'}</div>
-      <div class="drill-num">${item.label || ''}</div>
+      <div class="drill-num">${label}</div>
       <div class="drill-success">✓ Запомнил!</div>
-      <div class="drill-word" style="color:var(--success);">${item.word}</div>
+      <div class="drill-word" style="color:var(--success);">${word}</div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, () =>
           `<div class="drill-streak-dot filled"></div>`
         ).join('')}
       </div>
       <div style="margin-top:16px;">
-        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">${isLast ? 'Отлично!' : 'Дальше'}</button>
+        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">Отлично!</button>
       </div>
     `;
-
-    $('drillDoneBtn').addEventListener('click', () => {
-      if (isLast) {
-        closeDrill();
-        return;
-      }
-      currentIndex++;
-      correctInRow = 0;
-      showPhase();
-    });
+    $('drillDoneBtn').addEventListener('click', closeDrill);
   }
 }
 
@@ -1044,36 +1058,12 @@ function renderStudy() {
       ${showOrd && num.ord ? `<div class="sc-ord">${num.ord} (${num.ordRu})</div>` : ''}
     `;
     card.addEventListener('click', () => {
-      const items = [{
-        word: num.et,
-        audioText: num.et,
-        label: String(num.n),
-        sublabel: num.ru,
-        kindLabel: 'Количественное числительное'
-      }];
-
-      if (showOrd && num.ord) {
-        items.push({
-          word: num.ord,
-          audioText: num.ord,
-          label: `${num.n}-й`,
-          sublabel: num.ordRu,
-          kindLabel: 'Порядковое числительное'
-        });
-      }
-
-      openDrill(items);
+      openDrill(num.et, num.et, String(num.n), num.ru);
     });
     if (showOrd && num.ord) {
       card.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        openDrill([{
-          word: num.ord,
-          audioText: num.ord,
-          label: `${num.n}-й`,
-          sublabel: num.ordRu,
-          kindLabel: 'Порядковое числительное'
-        }]);
+        openDrill(num.ord, num.ord, `${num.n}-й`, num.ordRu);
       });
     }
     return card;
@@ -1100,7 +1090,8 @@ function renderStudy() {
 
   const note1 = document.createElement('div');
   note1.className = 'study-note';
-  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й) Образуются по-разному — нужно запоминать каждое.`;
+  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)<br>
+    Образуются по-разному — нужно запоминать каждое.`;
   p1.appendChild(note1);
 
   // ── TAB 2: 11–19 ──
@@ -1192,5 +1183,5 @@ function bindEvents(){
 }
 
 // ── INIT ──
-function init(){initSkills();initGamify();bindEvents();checkSaved();renderStartScreenBadges();injectHeatmapContainers();renderHeatmap('startHeatmap');}
+function init(){initSkills();initGamify();renderPackSelector();bindEvents();checkSaved();renderStartScreenBadges();injectHeatmapContainers();renderHeatmap('startHeatmap');}
 init();
