@@ -52,14 +52,14 @@ const UP = 2;
 const MAXLVL = 2;
 
 const SESSION_PACKS = [
-  { id:'all', label:'Все', nums: NUMBERS.map(x=>x.n), note:'Полная смешанная сессия' },
   { id:'1-5', label:'1–5', nums:[1,2,3,4,5], note:'Первые пять чисел и их формы' },
   { id:'6-10', label:'6–10', nums:[6,7,8,9,10], note:'Вторая пятёрка и порядковые' },
   { id:'11-20', label:'11–20', nums:[11,12,13,14,15,16,17,18,19,20], note:'Подростковые числа и двадцать' },
   { id:'30-100', label:'30–100', nums:[30,40,50,60,70,80,90,100], note:'Десятки и сто' },
+  { id:'all', label:'Все', nums: NUMBERS.map(x=>x.n), note:'Полная смешанная сессия' }
 ];
 
-let activePackId = 'all';
+let activePackId = '1-5';
 let sessionTotal = TOTAL;
 
 // ── HELPERS ──
@@ -391,7 +391,7 @@ function startGame(resume=false){
   if(resume&&hasSave()){
     const d=loadProgress();
     skillState=d.skillState;correct=d.correct||0;wrong=d.wrong||0;best=d.best||0;
-    activePackId=d.activePackId||activePackId||'all';
+    activePackId = d.activePackId || activePackId || '1-5';
   }else{
     initSkills();correct=0;wrong=0;best=0;
   }
@@ -747,20 +747,7 @@ function renderXpBar(){
   </div><div style="height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;">
     <div style="height:100%;width:${Math.min(pct,100)}%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .4s;"></div></div>`;
 }
-function renderStartScreenBadges(){
-  let c=$('startBadges');
-  if(!c){c=document.createElement('div');c.id='startBadges';c.style.cssText='width:100%;margin-top:8px;';
-    const info=document.querySelector('.start-info');if(info)info.parentNode.insertBefore(c,info);}
-  const g=gamifyState;if(!g||g.xp===0){c.innerHTML='';return;}
-  const earned=BADGES.filter(b=>g.earnedBadges.includes(b.id));
-  c.innerHTML=`<div style="padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);text-align:center;">
-    <div style="display:flex;justify-content:center;gap:16px;margin-bottom:8px;">
-      <span style="font-size:.78rem;font-weight:700;">⭐ Ур. ${g.level}</span>
-      <span style="font-size:.78rem;font-weight:700;">${g.xp} XP</span>
-      <span style="font-size:.78rem;font-weight:700;">🔥 ${g.dailyStreak} д.</span></div>
-    ${earned.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;">${earned.map(b=>`<span title="${b.name}" style="font-size:1.3rem;">${b.icon}</span>`).join('')}</div>`:''}
-    <div style="margin-top:6px;font-size:.7rem;color:var(--text-dim);font-family:'DM Mono',monospace;">${earned.length}/${BADGES.length} достижений</div></div>`;
-}
+
 function renderResultBadges(){
   let c=$('resultBadges');
   if(!c){c=document.createElement('div');c.id='resultBadges';c.style.cssText='width:100%;margin-top:12px;';
@@ -886,13 +873,13 @@ function openDrill(word, audioText, label, sublabel) {
   showPhase();
 
   function showPhase() {
-    const showTime = correctInRow === 0 ? 4000 : 3000;
-
+    //const showTime = correctInRow === 0 ? 4000 : 2500;
+    const showTime = correctInRow === 0 ? 1000004000 : 2500;
     phase.innerHTML = `
       <div class="drill-num">${label}</div>
       <div class="drill-ru">${sublabel}</div>
       <div class="drill-hint">Запоминай написание:</div>
-      <div class="drill-word pulse">${word}</div>
+      <div class="drill-word">${word}</div>
       <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
       <div class="drill-streak-dots">
         ${Array.from({length: NEEDED}, (_, i) =>
@@ -1016,7 +1003,7 @@ function renderStudy() {
     { id: 'tab1', label: '1–10' },
     { id: 'tab2', label: '11–19' },
     { id: 'tab3', label: '20–100' },
-    { id: 'tab4', label: '💬' },
+    { id: 'tab4', label: 'Примеры' },
   ];
 
   const tabBar = document.createElement('div');
@@ -1090,7 +1077,7 @@ function renderStudy() {
 
   const note1 = document.createElement('div');
   note1.className = 'study-note';
-  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)<br>
+  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)
     Образуются по-разному — нужно запоминать каждое.`;
   p1.appendChild(note1);
 
@@ -1130,9 +1117,8 @@ function renderStudy() {
 
   const note4top = document.createElement('div');
   note4top.className = 'study-note';
-  note4top.innerHTML = `<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass)<br>
-    После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)<br>
-    Как в русском: "одна книга" vs "пять книг"`;
+  note4top.innerHTML = `<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass)
+    После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)`;
   p4.appendChild(note4top);
 
   const sentWrap = document.createElement('div');
@@ -1168,7 +1154,7 @@ function bindEvents(){
   $('restartBtn').addEventListener('click',restartFromPause);
   $('pauseHomeBtn').addEventListener('click',goHomeFromPause);
   $('retryBtn').addEventListener('click',()=>startGame(false));
-  $('homeBtn').addEventListener('click',()=>{showScr('startScreen');checkSaved();renderStartScreenBadges();refreshHeatmaps();});
+  $('homeBtn').addEventListener('click',()=>{showScr('startScreen');checkSaved();refreshHeatmaps();});
   $('nextBtn').addEventListener('click',nextQ);
   $('pauseModal').addEventListener('click',e=>{if(e.target.id==='pauseModal')closePauseModal();});
   document.addEventListener('keydown',e=>{
