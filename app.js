@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════
 // Eesti Numbrid — Estonian Numbers Trainer
-// Architecture: BLUEPRINT.md (pronoun-olema-drill pattern)
+// Architecture: Leitner 3-box + linear stages
 // ═══════════════════════════════════════════
 
-// ── DATA ──
+// ══ DATA ══
 const NUMBERS = [
   {n:1, et:'üks', ru:'один', ord:'esimene', ordRu:'первый'},
   {n:2, et:'kaks', ru:'два', ord:'teine', ordRu:'второй'},
@@ -35,10 +35,6 @@ const NUMBERS = [
   {n:100, et:'sada', ru:'сто', ord:'sajas', ordRu:'сотый'},
 ];
 
-// Nouns for sentences
-// ruOne: "одно яблоко" (nom with correct gender of один)
-// ruGen: genitive sg for 2-4 ("два яблока")
-// ruGenPl: genitive pl for 5+ ("пять яблок")
 const NOUNS = [
   {nom:'õun', part:'õuna', gender:'n', ruOne:'одно яблоко', ruGen:'яблока', ruGenPl:'яблок'},
   {nom:'raamat', part:'raamatut', gender:'f', ruOne:'одна книга', ruGen:'книги', ruGenPl:'книг'},
@@ -46,387 +42,161 @@ const NOUNS = [
   {nom:'kass', part:'kassi', gender:'f', ruOne:'одна кошка', ruGen:'кошки', ruGenPl:'кошек'},
 ];
 
-const SAVE_KEY = 'numbrid_save';
-const TOTAL = 50;
-const UP = 2;
-const MAXLVL = 2;
-
-const SESSION_PACKS = [
-  { id:'1-5', label:'1–5', nums:[1,2,3,4,5], note:'Первые пять чисел и их формы' },
-  { id:'6-10', label:'6–10', nums:[6,7,8,9,10], note:'Вторая пятёрка и порядковые' },
-  { id:'11-20', label:'11–20', nums:[11,12,13,14,15,16,17,18,19,20], note:'Подростковые числа и двадцать' },
-  { id:'30-100', label:'30–100', nums:[30,40,50,60,70,80,90,100], note:'Десятки и сто' },
-  { id:'all', label:'Все', nums: NUMBERS.map(x=>x.n), note:'Полная смешанная сессия' }
+// ══ STAGES ══
+const STAGES = [
+  { id:1, label:'Числа 1–5',     nums:[1,2,3,4,5] },
+  { id:2, label:'Числа 6–10',    nums:[6,7,8,9,10] },
+  { id:3, label:'Числа 11–20',   nums:[11,12,13,14,15,16,17,18,19,20] },
+  { id:4, label:'Десятки 30–100', nums:[30,40,50,60,70,80,90,100] },
 ];
 
-let activePackId = '1-5';
-let sessionTotal = TOTAL;
+const SAVE_KEY = 'numbrid_v2';
+const SESSION_LEN = 20;
+const STREAK_NEEDED = 2;
 
-// ── HELPERS ──
-function $(id){return document.getElementById(id);}
-function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}return b;}
-function pick(a){return a[Math.floor(Math.random()*a.length)];}
-function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
-function unique(a){return[...new Set(a)];}
-function normalize(s){return String(s||'').toLowerCase().replace(/[?.!,]/g,'').replace(/\s+/g,' ').trim();}
-function showScr(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));$(id).classList.add('active');}
-function showToast(text){const t=$('toast');t.textContent=text;t.classList.add('show');clearTimeout(showToast._t);showToast._t=setTimeout(()=>t.classList.remove('show'),1600);}
+// ══ HELPERS ══
+function $(id){ return document.getElementById(id); }
+function shuffle(a){ const b=[...a]; for(let i=b.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]; } return b; }
+function pick(a){ return a[Math.floor(Math.random()*a.length)]; }
+function normalize(s){ return String(s||'').toLowerCase().replace(/[?.!,]/g,'').replace(/\s+/g,' ').trim(); }
+function showScr(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active')); $(id).classList.add('active'); }
+function showToast(text){ const t=$('toast'); t.textContent=text; t.classList.add('show'); clearTimeout(showToast._t); showToast._t=setTimeout(()=>t.classList.remove('show'),1600); }
+function getNum(n){ return NUMBERS.find(x=>x.n===n); }
+function numsWithOrd(){ return NUMBERS.filter(x=>!!x.ord); }
+function numsSentence(){ return NUMBERS.filter(x=>x.n>=1&&x.n<=19); }
 
-// Number helpers
-function getNum(n){return NUMBERS.find(x=>x.n===n);}
-function hasOrd(num){return !!num.ord;}
-function nums1to10(){return NUMBERS.filter(x=>x.n>=1&&x.n<=10);}
-function nums11to19(){return NUMBERS.filter(x=>x.n>=11&&x.n<=19);}
-function numsTens(){return NUMBERS.filter(x=>x.n>=20);}
-function numsWithOrd(){return NUMBERS.filter(x=>!!x.ord);}
-// Numbers suitable for sentences (1-19)
-function numsSentence(){return NUMBERS.filter(x=>x.n>=1&&x.n<=19);}
-function getPack(id){return SESSION_PACKS.find(x=>x.id===id)||SESSION_PACKS[0];}
-function getActiveNumbers(){const allowed=new Set(getPack(activePackId).nums);return NUMBERS.filter(x=>allowed.has(x.n));}
-function getActiveNumbersWithOrd(){return getActiveNumbers().filter(x=>!!x.ord);}
-function getActiveSentenceNumbers(){return getActiveNumbers().filter(x=>x.n>=1&&x.n<=19);}
-function getActiveSkillEntries(){
-  const allowed=new Set(getPack(activePackId).nums);
-  return Object.entries(skillState).filter(([key])=>{
-    const parsed=parseSkillKey(key);
-    return parsed&&allowed.has(parsed.num.n);
-  });
-}
-function calcSessionTotal(){
-  const skillCount=getActiveSkillEntries().length||getPack(activePackId).nums.length;
-  return Math.max(12, Math.min(TOTAL, Math.round(skillCount*1.35)));
-}
-function getPackLabel(id=activePackId){return getPack(id).label;}
+// ══ AUDIO ══
+let currentAudio=null, audioGen=0;
+function getAudioFile(text){ let name=text.toLowerCase().trim().replace(/[?.!,]/g,'').trim().replace(/[^a-zõäöü0-9\s]/g,'').replace(/\s+/g,'_').trim(); return 'audio/'+name+'.mp3'; }
+function playAudio(text){ stopAudio(); const gen=++audioGen; return new Promise(resolve=>{ const a=new Audio(getAudioFile(text)); currentAudio=a; const done=()=>{if(gen===audioGen)currentAudio=null;resolve();}; a.onended=done; a.onerror=done; a.play().catch(done); }); }
+function stopAudio(){ if(currentAudio){currentAudio.onended=null;currentAudio.onerror=null;currentAudio.pause();currentAudio=null;} }
 
-// ── AUDIO ──
-function getAudioFile(text){
-  let name=text.toLowerCase().trim().replace(/[?.!,]/g,'').trim();
-  name=name.replace(/[^a-zõäöü0-9\s]/g,'');
-  name=name.replace(/\s+/g,'_').trim();
-  return 'audio/'+name+'.mp3';
-}
-let currentAudio=null;
-function playAudio(text){
-  return new Promise(resolve=>{
-    if(currentAudio){currentAudio.pause();currentAudio=null;}
-    currentAudio=new Audio(getAudioFile(text));
-    currentAudio.onended=resolve;
-    currentAudio.onerror=resolve;
-    currentAudio.play().catch(resolve);
-  });
-}
-function stopAudio(){if(currentAudio){currentAudio.pause();currentAudio=null;}}
+// ══ SENTENCE BUILDER ══
+function getRuNumeral(num,noun){ return num.n===2?(noun.gender==='f'?'две':'два'):num.ru; }
+function makeSentence(num,noun){ const nf=num.n===1?noun.nom:noun.part; const et=`Mul on ${num.et} ${nf}`; let ru; if(num.n===1)ru=`У меня ${noun.ruOne}`; else if(num.n<=4)ru=`У меня ${getRuNumeral(num,noun)} ${noun.ruGen}`; else ru=`У меня ${num.ru} ${noun.ruGenPl}`; return{et,ru,words:['Mul','on',num.et,nf]}; }
 
-function getRuNumeral(num, noun) {
-  if (num.n === 2) {
-    return noun.gender === 'f' ? 'две' : 'два';
-  }
-  return num.ru;
-}
+// ═══════════════════════════════════════════
+// ══ LEITNER STATE ══
+// Box 0=New → Box 1=Learning → Box 2=Mastered
+// 2 correct in a row → advance. 1 wrong → back to 0.
+// ═══════════════════════════════════════════
+let skillState={}, currentStage=1;
+let correct=0,wrong=0,streak=0,best=0,qNum=0,ans=false,curEx=null;
 
-// ── SENTENCE BUILDER ──
-function makeSentence(num, noun) {
-  const nounForm = num.n === 1 ? noun.nom : noun.part;
-  const et = `Mul on ${num.et} ${nounForm}`;
+function makeSkill(){ return {box:0,streak:0,totalCorrect:0,totalWrong:0}; }
+function initSkills(){ skillState={}; NUMBERS.forEach(num=>{ skillState[`n${num.n}_card`]=makeSkill(); if(num.ord)skillState[`n${num.n}_ord`]=makeSkill(); if(num.n>=1&&num.n<=19)skillState[`n${num.n}_sent`]=makeSkill(); }); }
 
-  let ru;
-  if (num.n === 1) {
-    ru = `У меня ${noun.ruOne}`;
-  } else if (num.n >= 2 && num.n <= 4) {
-    ru = `У меня ${getRuNumeral(num, noun)} ${noun.ruGen}`;
-  } else {
-    ru = `У меня ${num.ru} ${noun.ruGenPl}`;
-  }
+// ══ STAGE HELPERS ══
+function getStage(id){ return STAGES.find(s=>s.id===id)||STAGES[0]; }
+function getStageSkillKeys(sid){ const st=getStage(sid||currentStage); const keys=[]; st.nums.forEach(n=>{keys.push(`n${n}_card`); const num=getNum(n); if(num&&num.ord)keys.push(`n${n}_ord`); if(n>=1&&n<=19)keys.push(`n${n}_sent`);}); return keys; }
+function getStageSkills(sid){ return getStageSkillKeys(sid||currentStage).map(k=>[k,skillState[k]]).filter(([_,s])=>s); }
+function getStageNumbers(sid){ return getStage(sid||currentStage).nums.map(n=>getNum(n)).filter(Boolean); }
+function getStageMastered(sid){ return getStageSkills(sid).filter(([_,s])=>s.box>=2).length; }
+function getStageTotal(sid){ return getStageSkillKeys(sid||currentStage).length; }
+function isStageComplete(sid){ return getStageMastered(sid)===getStageTotal(sid); }
+function getMaxUnlockedStage(){ for(let i=STAGES.length;i>=1;i--){ if(i===1)return 1; if(isStageComplete(i-1))return i; } return 1; }
 
-  return { et, ru, words: ['Mul', 'on', num.et, nounForm] };
-}
+// ══ SAVE / LOAD ══
+function saveProgress(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify({skillState,currentStage,ts:Date.now()}));}catch(e){} }
+function loadProgress(){ try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw)return null; const d=JSON.parse(raw); if(!d.skillState)return null; Object.values(d.skillState).forEach(sk=>{if(sk.box===undefined)sk.box=sk.level||0;if(sk.streak===undefined)sk.streak=0;if(sk.totalCorrect===undefined)sk.totalCorrect=0;if(sk.totalWrong===undefined)sk.totalWrong=0;}); return d; }catch(e){return null;} }
+function hasSave(){ return !!loadProgress(); }
 
-// ── SM-2 / SKILL STATE ──
-let skillState = {};
-let correct=0, wrong=0, streak=0, best=0, qNum=0, ans=false, curEx=null;
-
-function initSkills(){
-  skillState={};
-  // Skills: each number has forms: cardinal, ordinal (if exists), sentence (if 1-19)
-  NUMBERS.forEach(num=>{
-    // Cardinal: "7 → seitse"
-    skillState[`n${num.n}_card`]={level:0,streak:0,done:false,ef:2.5,interval:0,reps:0,nextReview:0,lastReview:0,totalCorrect:0,totalWrong:0};
-    // Ordinal: "7th → seitsmes" (only 1-10)
-    if(num.ord){
-      skillState[`n${num.n}_ord`]={level:0,streak:0,done:false,ef:2.5,interval:0,reps:0,nextReview:0,lastReview:0,totalCorrect:0,totalWrong:0};
-    }
-    // Sentence: "Mul on seitse õuna" (only 1-19)
-    if(num.n>=1 && num.n<=19){
-      skillState[`n${num.n}_sent`]={level:0,streak:0,done:false,ef:2.5,interval:0,reps:0,nextReview:0,lastReview:0,totalCorrect:0,totalWrong:0};
-    }
-  });
-}
-
-function saveProgress(){
-  try{localStorage.setItem(SAVE_KEY,JSON.stringify({skillState,correct,wrong,best,total:correct+wrong,ts:Date.now(),activePackId}));}catch(e){}
-}
-function loadProgress(){
-  try{
-    const raw=localStorage.getItem(SAVE_KEY);
-    if(!raw)return null;
-    const data=JSON.parse(raw);
-    if(data.skillState){Object.values(data.skillState).forEach(sk=>{
-      if(sk.ef===undefined)sk.ef=2.5;if(sk.interval===undefined)sk.interval=0;
-      if(sk.reps===undefined)sk.reps=0;if(sk.nextReview===undefined)sk.nextReview=0;
-      if(sk.lastReview===undefined)sk.lastReview=0;if(sk.totalCorrect===undefined)sk.totalCorrect=0;
-      if(sk.totalWrong===undefined)sk.totalWrong=0;
-    });}
-    return data;
-  }catch(e){return null;}
-}
-function hasSave(){const d=loadProgress();return d&&d.skillState&&Object.values(d.skillState).some(s=>s.lastReview>0);}
-
-function checkSaved(){
-  let contBtn=$('continueBtn');
-  if(!contBtn){
-    const primary=$('startBtn');
-    contBtn=document.createElement('button');contBtn.id='continueBtn';
-    contBtn.className='btn btn-secondary';
-    contBtn.addEventListener('click',()=>startGame(true));
-    primary.parentNode.insertBefore(contBtn,primary.nextSibling);
-  }
-  if(hasSave()){
-    const d=loadProgress();const now=Date.now();
-    const skills=Object.values(d.skillState);
-    const mastered=skills.filter(s=>s.done).length;
-    const due=skills.filter(s=>s.lastReview>0&&s.nextReview<=now).length;
-    const fresh=skills.filter(s=>s.reps===0&&s.lastReview===0).length;
-    contBtn.style.display='';
-    if(due>0)contBtn.textContent=`Повторить (${due} на повторение)`;
-    else if(fresh>0)contBtn.textContent=`Продолжить (${fresh} новых)`;
-    else contBtn.textContent=`Продолжить (${mastered} освоено)`;
-  }else{contBtn.style.display='none';}
-}
-
-// ── PICK SKILL (SM-2 aware) ──
+// ═══════════════════════════════════════════
+// ══ SKILL PICKER ══
+// Priority: Box 0 > Box 1 > Box 2
+// ═══════════════════════════════════════════
 function pickSkill(){
-  const now=Date.now();
-  const entries=getActiveSkillEntries();
-  const fresh=entries.filter(([_,s])=>s.reps===0&&s.lastReview===0);
-  const overdue=entries.filter(([_,s])=>s.lastReview>0&&s.nextReview<=now).sort((a,b)=>a[1].nextReview-b[1].nextReview);
-  const upcoming=entries.filter(([_,s])=>s.lastReview>0&&s.nextReview>now).sort((a,b)=>a[1].nextReview-b[1].nextReview);
-  let pool=overdue.length?overdue:fresh.length?fresh:upcoming.length?upcoming:null;
+  const entries=getStageSkills();
+  const box0=entries.filter(([_,s])=>s.box===0);
+  const box1=entries.filter(([_,s])=>s.box===1);
+  const box2=entries.filter(([_,s])=>s.box===2);
+  const pool=box0.length?box0:box1.length?box1:box2.length?box2:null;
   if(!pool)return null;
   const weighted=[];
-  pool.slice(0,10).forEach(([key,s])=>{
-    const w=Math.max(1,(3-s.level)+(s.ef<2?3:s.ef<2.5?2:1)+(s.totalWrong>s.totalCorrect?2:1));
-    for(let i=0;i<w;i++)weighted.push(key);
-  });
+  pool.forEach(([key,s])=>{ const w=Math.max(1,1+s.totalWrong-s.totalCorrect); for(let i=0;i<w;i++)weighted.push(key); });
   return weighted[Math.floor(Math.random()*weighted.length)];
 }
 
-// ── EXERCISE GENERATORS ──
+// ═══════════════════════════════════════════
+// ══ EXERCISE GENERATORS ══
+// ═══════════════════════════════════════════
+function parseSkillKey(key){ const m=key.match(/^n(\d+)_(\w+)$/); if(!m)return null; return{num:getNum(parseInt(m[1])),form:m[2]}; }
 
-function parseSkillKey(key){
-  // "n7_card" → {num: {n:7,...}, form: 'card'}
-  const m=key.match(/^n(\d+)_(\w+)$/);
-  if(!m)return null;
-  return{num:getNum(parseInt(m[1])),form:m[2]};
-}
+function makeChoiceNumToWord(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et); return{type:'choice',label:'Как будет по-эстонски?',qText:`${num.n}`,qRu:num.ru,answer:num.et,options:shuffle([num.et,...wr]),reveal:num.et,_skillKey:key}; }
+function makeChoiceWordToNum(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n)); return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',answer:String(num.n),options:shuffle([String(num.n),...wr]),reveal:`${num.et} = ${num.n}`,_skillKey:key}; }
+function makeChoiceOrdinal(num,key){ const pool=getStageNumbers().filter(x=>!!x.ord); const fb=pool.length>1?pool:numsWithOrd(); const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord); return{type:'choice',label:'Порядковое числительное',qText:`${num.n}-й (${num.ordRu})`,qRu:'',answer:num.ord,options:shuffle([num.ord,...wr]),reveal:`${num.ordRu} = ${num.ord}`,_skillKey:key}; }
+function makeChoiceSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); const pool=getStageNumbers().filter(x=>x.n<=19); const fb=pool.length>1?pool:numsSentence(); const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.et); const nf=num.n===1?noun.nom:noun.part; return{type:'choice',label:'Вставь число',qText:`Mul on ___ ${nf}`,qRu:s.ru,answer:num.et,options:shuffle([num.et,...wr]),reveal:s.et,_skillKey:key}; }
 
-// Choice: number → word
-function makeChoiceNumToWord(num,key){
-  const pool=getActiveNumbers();
-  const fallback=pool.length>1?pool:NUMBERS;
-  const wrongs=shuffle(fallback.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et);
-  return{type:'choice',label:'Как будет по-эстонски?',qText:`${num.n}`,qRu:`${num.ru}`,
-    answer:num.et,options:shuffle([num.et,...wrongs]),reveal:num.et,_skillKey:key};
-}
+function makeBuildSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); const dist=[]; const oth=getStageNumbers().filter(x=>x.n!==num.n); const extra=pick(oth.length?oth:NUMBERS.filter(x=>x.n!==num.n)); if(extra)dist.push(extra.et); const wn=pick(NOUNS.filter(x=>x.nom!==noun.nom)); if(wn)dist.push(num.n===1?wn.nom:wn.part); return{type:'build',label:'Собери предложение',qRu:s.ru,answer:s.words,bank:shuffle([...s.words,...dist.slice(0,2)]),reveal:s.et,_skillKey:key}; }
 
-// Choice: word → number
-function makeChoiceWordToNum(num,key){
-  const pool=getActiveNumbers();
-  const fallback=pool.length>1?pool:NUMBERS;
-  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n));
-  return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',
-    answer:String(num.n),options:shuffle([String(num.n),...wrongs]),reveal:`${num.et} = ${num.n}`,_skillKey:key};
-}
+function makeTypingNumToWord(num,key){ return{type:'typing',label:'Напиши число словом',qText:`Напиши по-эстонски: ${num.n}`,qRu:num.ru,answer:normalize(num.et),reveal:num.et,_skillKey:key}; }
+function makeTypingOrdinal(num,key){ return{type:'typing',label:'Напиши порядковое',qText:`Напиши по-эстонски: ${num.n}-й`,qRu:num.ordRu,answer:normalize(num.ord),reveal:num.ord,_skillKey:key}; }
+function makeTypingSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); return{type:'typing',label:'Переведи на эстонский',qText:'Переведи:',qRu:s.ru,answer:normalize(s.et),reveal:s.et,_skillKey:key}; }
+function makeTypingRuToEt(num,key){ return{type:'typing',label:'Переведи число',qText:`${num.ru} по-эстонски:`,qRu:'',answer:normalize(num.et),reveal:num.et,_skillKey:key}; }
+function makeTypingOrdRuToEt(num,key){ return{type:'typing',label:'Напиши порядковое',qText:`«${num.ordRu}» по-эстонски:`,qRu:'',answer:normalize(num.ord),reveal:num.ord,_skillKey:key}; }
 
-// Choice: ordinal
-function makeChoiceOrdinal(num,key){
-  const pool=getActiveNumbersWithOrd();
-  const fallback=pool.length>1?pool:numsWithOrd();
-  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord);
-  return{type:'choice',label:'Порядковое числительное',qText:`${num.n}-й (${num.ordRu})`,qRu:'',
-    answer:num.ord,options:shuffle([num.ord,...wrongs]),reveal:`${num.ordRu} = ${num.ord}`,_skillKey:key};
-}
+function makeDictationNumber(num,key){ return{type:'dictation',label:'Аудио-диктант',qText:'Послушай и напиши число:',audioSentence:num.et,answer:normalize(num.et),reveal:num.et,_skillKey:key}; }
+function makeDictationSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); return{type:'dictation',label:'Аудио-диктант',qText:'Послушай и напиши:',audioSentence:s.et,answer:normalize(s.et),reveal:s.et,_skillKey:key}; }
+function makeDictationOrdinal(num,key){ return{type:'dictation',label:'Аудио-диктант (порядковое)',qText:'Послушай и напиши порядковое:',audioSentence:num.ord,answer:normalize(num.ord),reveal:num.ord,_skillKey:key}; }
 
-// Choice: sentence — pick the number word
-function makeChoiceSentence(num,key){
-  const noun=pick(NOUNS);
-  const s=makeSentence(num,noun);
-  const pool=getActiveSentenceNumbers();
-  const fallback=pool.length>1?pool:numsSentence();
-  const wrongs=shuffle(fallback.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.et);
-  const nounForm=num.n===1?noun.nom:noun.part;
-  return{type:'choice',label:'Вставь число',qText:`Mul on ___ ${nounForm}`,qRu:s.ru,
-    answer:num.et,options:shuffle([num.et,...wrongs]),reveal:s.et,_skillKey:key};
-}
-
-// Build: sentence
-function makeBuildSentence(num,key){
-  const noun=pick(NOUNS);
-  const s=makeSentence(num,noun);
-  const distractors=[];
-  const extra=pick(getActiveNumbers().filter(x=>x.n!==num.n).length?getActiveNumbers().filter(x=>x.n!==num.n):NUMBERS.filter(x=>x.n!==num.n));
-  if(extra)distractors.push(extra.et);
-  const wrongNoun=pick(NOUNS.filter(x=>x.nom!==noun.nom));
-  if(wrongNoun)distractors.push(num.n===1?wrongNoun.nom:wrongNoun.part);
-  return{type:'build',label:'Собери предложение',qRu:s.ru,answer:s.words,
-    bank:shuffle([...s.words,...distractors.slice(0,2)]),reveal:s.et,_skillKey:key};
-}
-
-// Build: number word from hint
-function makeBuildNumber(num,key){
-  // Show the digit, build the word letter groups
-  // Split word into chunks for building
-  const word=num.et;
-  let chunks=[];
-  if(word.length<=5){chunks=[word];}
-  else{
-    // Split into 2-3 parts
-    const mid=Math.ceil(word.length/2);
-    chunks=[word.slice(0,mid),word.slice(mid)];
-  }
-  // Add distractor chunks
-  const other=pick(getActiveNumbers().filter(x=>x.et!==num.et&&x.et.length>3).length?getActiveNumbers().filter(x=>x.et!==num.et&&x.et.length>3):NUMBERS.filter(x=>x.et!==num.et&&x.et.length>3));
-  const otherChunks=other?[other.et.slice(0,Math.ceil(other.et.length/2))]:[];
-  // Actually, for build let's use sentence building as it's more useful
-  // Fall back to sentence
-  const noun=pick(NOUNS);
-  const s=makeSentence(num,noun);
-  const extra=pick(getActiveNumbers().filter(x=>x.n!==num.n).length?getActiveNumbers().filter(x=>x.n!==num.n):NUMBERS.filter(x=>x.n!==num.n));
-  const distractors=[extra?extra.et:'null'].filter(x=>x!=='null');
-  return{type:'build',label:'Собери предложение',qRu:s.ru,answer:s.words,
-    bank:shuffle([...s.words,...distractors]),reveal:s.et,_skillKey:key};
-}
-
-// Typing: digit → write word
-function makeTypingNumToWord(num,key){
-  return{type:'typing',label:'Напиши число словом',qText:`Напиши по-эстонски: ${num.n}`,qRu:num.ru,
-    answer:normalize(num.et),reveal:num.et,_skillKey:key};
-}
-
-// Typing: ordinal
-function makeTypingOrdinal(num,key){
-  return{type:'typing',label:'Напиши порядковое',qText:`Напиши по-эстонски: ${num.n}-й`,qRu:num.ordRu,
-    answer:normalize(num.ord),reveal:num.ord,_skillKey:key};
-}
-
-// Typing: translate sentence
-function makeTypingSentence(num,key){
-  const noun=pick(NOUNS);
-  const s=makeSentence(num,noun);
-  return{type:'typing',label:'Переведи на эстонский',qText:'Переведи:',qRu:s.ru,
-    answer:normalize(s.et),reveal:s.et,_skillKey:key};
-}
-
-// Typing: RU word → ET word
-function makeTypingRuToEt(num,key){
-  return{type:'typing',label:'Переведи число',qText:`${num.ru} по-эстонски:`,qRu:'',
-    answer:normalize(num.et),reveal:num.et,_skillKey:key};
-}
-
-// Dictation
-function makeDictationNumber(num,key){
-  return{type:'dictation',label:'Аудио-диктант',qText:'Послушай и напиши число:',
-    audioSentence:num.et,answer:normalize(num.et),reveal:num.et,_skillKey:key};
-}
-
-function makeDictationSentence(num,key){
-  const noun=pick(NOUNS);
-  const s=makeSentence(num,noun);
-  return{type:'dictation',label:'Аудио-диктант',qText:'Послушай и напиши:',
-    audioSentence:s.et,answer:normalize(s.et),reveal:s.et,_skillKey:key};
-}
-
-// ── EXERCISE ROUTING ──
+// ══ EXERCISE ROUTING (box-based) ══
 function makeExForSkill(skillKey){
   const parsed=parseSkillKey(skillKey);
-  if(!parsed)return makeChoiceNumToWord(pick(getActiveNumbers().length?getActiveNumbers():NUMBERS),skillKey);
+  if(!parsed)return makeChoiceNumToWord(pick(getStageNumbers()),skillKey);
   const{num,form}=parsed;
+  const sk=skillState[skillKey];
+  const box=sk?sk.box:0;
   const roll=Math.random();
-
-  // Progressive distribution
-  let choiceP,buildP;
-  if(qNum<=10){choiceP=0.80;buildP=0.95;}
-  else if(qNum<=25){choiceP=0.40;buildP=0.65;}
-  else{choiceP=0.15;buildP=0.30;}
+  let choiceP,buildP,typingP;
+  if(box===0)     {choiceP=0.50;buildP=0.65;typingP=0.85;}
+  else if(box===1){choiceP=0.20;buildP=0.35;typingP=0.70;}
+  else            {choiceP=0.00;buildP=0.10;typingP=0.55;}
 
   if(form==='card'){
-    if(roll<choiceP){
-      return Math.random()>0.5?makeChoiceNumToWord(num,skillKey):makeChoiceWordToNum(num,skillKey);
-    }
-    if(roll<buildP&&num.n<=19){
-      return makeBuildSentence(num,skillKey);
-    }
-    // typing
-    return pick([makeTypingNumToWord,makeTypingRuToEt,
-      ...(num.n<=19?[makeDictationNumber]:[])
-    ])(num,skillKey);
+    if(roll<choiceP)return Math.random()>0.5?makeChoiceNumToWord(num,skillKey):makeChoiceWordToNum(num,skillKey);
+    if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
+    if(roll<typingP)return pick([makeTypingNumToWord,makeTypingRuToEt])(num,skillKey);
+    return makeDictationNumber(num,skillKey);
   }
-
   if(form==='ord'){
     if(roll<choiceP)return makeChoiceOrdinal(num,skillKey);
-    if(roll<buildP)return makeBuildSentence(num,skillKey);
-    return makeTypingOrdinal(num,skillKey);
+    if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
+    if(roll<typingP)return pick([makeTypingOrdinal,makeTypingOrdRuToEt])(num,skillKey);
+    return makeDictationOrdinal(num,skillKey);
   }
-
   if(form==='sent'){
     if(roll<choiceP)return makeChoiceSentence(num,skillKey);
     if(roll<buildP)return makeBuildSentence(num,skillKey);
-    return pick([makeTypingSentence,makeDictationSentence])(num,skillKey);
+    if(roll<typingP)return makeTypingSentence(num,skillKey);
+    return makeDictationSentence(num,skillKey);
   }
-
   return makeChoiceNumToWord(num,skillKey);
 }
 
-// ── GAME FLOW ──
-function startGame(resume=false){
-  if(resume&&hasSave()){
-    const d=loadProgress();
-    skillState=d.skillState;correct=d.correct||0;wrong=d.wrong||0;best=d.best||0;
-    activePackId = d.activePackId || activePackId || '1-5';
-  }else{
-    initSkills();correct=0;wrong=0;best=0;
-  }
-  streak=0;qNum=0;ans=false;curEx=null;
-  sessionTotal=calcSessionTotal();
-  renderPackSelector();
+// ═══════════════════════════════════════════
+// ══ GAME FLOW ══
+// ═══════════════════════════════════════════
+function startGame(){
+  correct=0;wrong=0;best=0;streak=0;qNum=0;ans=false;curEx=null;
   $('resultBarFill').style.width='0%';
-  closePauseModal();
-  showScr('gameScreen');
-  nextQ();
+  closePauseModal();showScr('gameScreen');nextQ();
 }
 
 function nextQ(){
-  if(qNum>=sessionTotal){showResults();return;}
+  if(qNum>=SESSION_LEN){showResults();return;}
   const sk=pickSkill();
   if(!sk){showResults();return;}
-  curEx=makeExForSkill(sk);
-  qNum++;
-  renderEx();
+  curEx=makeExForSkill(sk);qNum++;renderEx();
 }
 
 function renderEx(){
-  ans=false;
-  const ex=curEx;
-  const card=$('questionCard');
-  card.classList.remove('animate-in');void card.offsetWidth;card.classList.add('animate-in');
-  $('correctReveal').textContent='';
-  $('nextBtn').style.display='none';
-  $('qHint').textContent='';
+  ans=false; const ex=curEx;
+  const card=$('questionCard'); card.classList.remove('animate-in'); void card.offsetWidth; card.classList.add('animate-in');
+  $('correctReveal').textContent=''; $('nextBtn').style.display='none'; $('qHint').textContent='';
   $('exerciseTypeLabel').textContent=ex.label||'Задание';
   $('qText').textContent=ex.qText||'';
-  if(ex.qRu&&ex.qRu.length>0){$('qRu').textContent=ex.qRu;$('qRu').style.display='';}
-  else{$('qRu').style.display='none';}
-  $('exerciseArea').innerHTML='';
-  stopAudio();hideReplayBtn();
+  if(ex.qRu&&ex.qRu.length>0){$('qRu').textContent=ex.qRu;$('qRu').style.display='';}else{$('qRu').style.display='none';}
+  $('exerciseArea').innerHTML=''; stopAudio(); hideReplayBtn();
   if(ex.type==='choice')renderChoice(ex);
   if(ex.type==='build')renderBuild(ex);
   if(ex.type==='typing')renderTyping(ex);
@@ -434,24 +204,15 @@ function renderEx(){
   updStats();
 }
 
-// ── RENDERERS ──
+// ══ RENDERERS ══
 function renderChoice(ex){
   const wrap=document.createElement('div');wrap.className='options';
   ex.options.forEach(opt=>{
     const b=document.createElement('button');b.className='option-btn';b.textContent=opt;b.dataset.value=opt;
-    b.addEventListener('click',()=>{
-      if(ans)return;ans=true;
-      const ok=opt===ex.answer;
-      wrap.querySelectorAll('.option-btn').forEach(btn=>{
-        btn.disabled=true;
-        if(btn.dataset.value===ex.answer)btn.classList.add('correct-answer');
-        else if(btn===b&&!ok)btn.classList.add('wrong-answer');
-        else btn.classList.add('dimmed');
-      });
-      proc(ok);
-    });
-    wrap.appendChild(b);
-  });
+    b.addEventListener('click',()=>{if(ans)return;ans=true;const ok=opt===ex.answer;
+      wrap.querySelectorAll('.option-btn').forEach(btn=>{btn.disabled=true;if(btn.dataset.value===ex.answer)btn.classList.add('correct-answer');else if(btn===b&&!ok)btn.classList.add('wrong-answer');else btn.classList.add('dimmed');});
+      proc(ok);});
+    wrap.appendChild(b);});
   $('exerciseArea').appendChild(wrap);
 }
 
@@ -461,713 +222,296 @@ function renderBuild(ex){
   const bank=document.createElement('div');bank.className='word-bank';
   const submit=document.createElement('button');submit.className='build-submit';submit.textContent='Проверить';submit.disabled=true;
   const selected=[];
-  ex.bank.forEach((word,index)=>{
-    const chip=document.createElement('span');chip.className='word-chip';chip.textContent=word;chip.dataset.idx=index;
-    chip.addEventListener('click',()=>{
-      if(ans||chip.classList.contains('used'))return;
-      chip.classList.add('used');selected.push({word,index});renderTarget();
-    });
-    bank.appendChild(chip);
-  });
-  function renderTarget(){
-    target.innerHTML='';submit.disabled=selected.length===0;
-    selected.forEach((item,i)=>{
-      const chip=document.createElement('span');chip.className='word-chip in-target';chip.textContent=item.word;
-      chip.addEventListener('click',()=>{
-        if(ans)return;selected.splice(i,1);
-        const orig=bank.querySelector(`.word-chip[data-idx="${item.index}"]`);
-        if(orig)orig.classList.remove('used');renderTarget();
-      });
-      target.appendChild(chip);
-    });
-  }
-  submit.addEventListener('click',()=>{
-    if(ans||selected.length===0)return;ans=true;
-    const built=selected.map(i=>i.word).join(' ');
-    const ok=built===ex.answer.join(' ');
-    target.classList.add(ok?'correct':'wrong');
-    if(!ok)$('correctReveal').textContent=`Правильный вариант: ${ex.reveal}`;
-    bank.querySelectorAll('.word-chip').forEach(c=>c.style.pointerEvents='none');
-    submit.style.display='none';proc(ok);
-  });
-  $('exerciseArea').appendChild(target);
-  $('exerciseArea').appendChild(bank);
-  $('exerciseArea').appendChild(submit);
+  ex.bank.forEach((word,index)=>{const chip=document.createElement('span');chip.className='word-chip';chip.textContent=word;chip.dataset.idx=index;chip.addEventListener('click',()=>{if(ans||chip.classList.contains('used'))return;chip.classList.add('used');selected.push({word,index});rt();});bank.appendChild(chip);});
+  function rt(){target.innerHTML='';submit.disabled=selected.length===0;selected.forEach((item,i)=>{const chip=document.createElement('span');chip.className='word-chip in-target';chip.textContent=item.word;chip.addEventListener('click',()=>{if(ans)return;selected.splice(i,1);const o=bank.querySelector(`.word-chip[data-idx="${item.index}"]`);if(o)o.classList.remove('used');rt();});target.appendChild(chip);});}
+  submit.addEventListener('click',()=>{if(ans||selected.length===0)return;ans=true;const built=selected.map(i=>i.word).join(' ');const ok=built===ex.answer.join(' ');target.classList.add(ok?'correct':'wrong');if(!ok)$('correctReveal').textContent=`Правильный вариант: ${ex.reveal}`;bank.querySelectorAll('.word-chip').forEach(c=>c.style.pointerEvents='none');submit.style.display='none';proc(ok);});
+  $('exerciseArea').appendChild(target);$('exerciseArea').appendChild(bank);$('exerciseArea').appendChild(submit);
 }
 
 function renderTyping(ex){
-  if(ex.source){const src=document.createElement('div');src.className='transform-source';src.textContent=ex.source;$('exerciseArea').appendChild(src);}
   const wrap=document.createElement('div');wrap.className='typing-area';
   const inp=document.createElement('input');inp.type='text';inp.className='typing-input';inp.placeholder='Напиши по-эстонски...';inp.autocomplete='off';inp.spellcheck=false;
   const btn=document.createElement('button');btn.className='typing-submit';btn.textContent='Проверить';
-  btn.addEventListener('click',()=>checkTyping(inp,ex,btn));
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
-  wrap.appendChild(inp);wrap.appendChild(btn);$('exerciseArea').appendChild(wrap);
-  setTimeout(()=>inp.focus(),80);
+  btn.addEventListener('click',()=>checkTyping(inp,ex,btn));inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
+  wrap.appendChild(inp);wrap.appendChild(btn);$('exerciseArea').appendChild(wrap);setTimeout(()=>inp.focus(),80);
 }
 
-function checkTyping(inp,ex,btn){
-  if(ans)return;const val=normalize(inp.value);if(!val){showToast('Сначала введи ответ');return;}
-  ans=true;inp.disabled=true;if(btn)btn.style.display='none';
-  const ok=val===normalize(ex.answer);
-  inp.classList.add(ok?'correct':'wrong');
-  if(!ok){inp.classList.add('shake');$('correctReveal').textContent=`Правильный вариант: ${ex.reveal}`;}
-  proc(ok);
-}
+function checkTyping(inp,ex,btn){if(ans)return;const val=normalize(inp.value);if(!val){showToast('Сначала введи ответ');return;}ans=true;inp.disabled=true;if(btn)btn.style.display='none';const ok=val===normalize(ex.answer);inp.classList.add(ok?'correct':'wrong');if(!ok){inp.classList.add('shake');$('correctReveal').textContent=`Правильный вариант: ${ex.reveal}`;}proc(ok);}
 
 function renderDictation(ex){
-  $('qRu').style.display='none';
-  const area=$('exerciseArea');
+  $('qRu').style.display='none';const area=$('exerciseArea');
   const playRow=document.createElement('div');playRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
-  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';
-  playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;';playBtn.textContent='🔊 Послушать';
-  playBtn.addEventListener('click',()=>playAudio(ex.audioSentence));
+  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;display:none;';playBtn.textContent='🔊 Послушать ещё раз';
+  let isPlaying=false;
+  playBtn.addEventListener('click',()=>{if(isPlaying)return;isPlaying=true;playBtn.disabled=true;playBtn.style.opacity='0.5';playAudio(ex.audioSentence).then(()=>{isPlaying=false;playBtn.disabled=false;playBtn.style.opacity='1';});});
   playRow.appendChild(playBtn);area.appendChild(playRow);
-  setTimeout(()=>playAudio(ex.audioSentence),300);
+  setTimeout(()=>{playAudio(ex.audioSentence).then(()=>{playBtn.style.display='';});},300);
   const wrap=document.createElement('div');wrap.className='typing-area';
   const inp=document.createElement('input');inp.type='text';inp.className='typing-input';inp.placeholder='Напиши что услышал(а)...';inp.autocomplete='off';inp.spellcheck=false;
   const btn=document.createElement('button');btn.className='typing-submit';btn.textContent='Проверить';
-  btn.addEventListener('click',()=>checkTyping(inp,ex,btn));
-  inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
-  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);
-  setTimeout(()=>inp.focus(),400);
+  btn.addEventListener('click',()=>checkTyping(inp,ex,btn));inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
+  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);setTimeout(()=>inp.focus(),400);
 }
 
-function showReplayBtn(sentence){
-  hideReplayBtn();
-  const row=document.createElement('div');row.id='audioReplayRow';
-  row.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;';
-  const btn=document.createElement('button');btn.className='btn btn-secondary';
-  btn.style.cssText='width:auto;padding:8px 16px;font-size:0.85rem;';btn.textContent='🔊 Послушать';
-  btn.addEventListener('click',()=>playAudio(sentence));
-  row.appendChild(btn);$('nextBtn').parentNode.insertBefore(row,$('nextBtn'));
-}
+function showReplayBtn(sentence){hideReplayBtn();const row=document.createElement('div');row.id='audioReplayRow';row.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;';const btn=document.createElement('button');btn.className='btn btn-secondary';btn.style.cssText='width:auto;padding:8px 16px;font-size:0.85rem;';btn.textContent='🔊 Послушать';btn.addEventListener('click',()=>playAudio(sentence));row.appendChild(btn);$('nextBtn').parentNode.insertBefore(row,$('nextBtn'));}
 function hideReplayBtn(){const el=$('audioReplayRow');if(el)el.remove();}
 
-// ── PROC (SM-2) ──
+// ═══════════════════════════════════════════
+// ══ PROC (Leitner) ══
+// ═══════════════════════════════════════════
 function proc(ok){
-  const now=Date.now(),DAY=86400000;
   if(curEx._skillKey&&skillState[curEx._skillKey]){
-    const sk=skillState[curEx._skillKey];sk.lastReview=now;
-    let quality;
-    if(ok){
-      if(curEx.type==='typing'||curEx.type==='dictation')quality=5;
-      else if(curEx.type==='build')quality=4;
-      else quality=3;
-    }else{quality=1;}
-
-    if(ok){
-      sk.totalCorrect++;sk.streak++;
-      if(sk.streak>=UP){if(sk.level<MAXLVL){sk.level++;sk.streak=0;}else{sk.done=true;}}
-      if(sk.reps===0)sk.interval=1;
-      else if(sk.reps===1)sk.interval=3;
-      else sk.interval=Math.round(sk.interval*sk.ef);
-      sk.reps++;
-      sk.ef=sk.ef+(0.1-(5-quality)*(0.08+(5-quality)*0.02));
-      if(sk.ef<1.3)sk.ef=1.3;
-      sk.nextReview=now+(sk.interval*DAY);
-    }else{
-      sk.totalWrong++;sk.streak=0;sk.reps=0;sk.interval=0;
-      sk.nextReview=now+(10*60*1000);
-      sk.ef=Math.max(1.3,sk.ef-0.2);
-      if(sk.level>0)sk.level--;
-    }
+    const sk=skillState[curEx._skillKey];
+    if(ok){sk.totalCorrect++;sk.streak++;if(sk.streak>=STREAK_NEEDED&&sk.box<2){sk.box++;sk.streak=0;}}
+    else{sk.totalWrong++;sk.box=0;sk.streak=0;}
   }
-  if(ok){correct++;streak++;if(streak>best)best=streak;}
-  else{wrong++;streak=0;}
-
-  gamifyOnAnswer(ok,curEx.type);
+  if(ok){correct++;streak++;if(streak>best)best=streak;}else{wrong++;streak=0;}
   updStats();saveProgress();
-
   const sentence=curEx.reveal||curEx.audioSentence||'';
-  const nextBtn=$('nextBtn');
-  nextBtn.textContent=qNum>=sessionTotal?'Результаты':'Далее';
-  if(sentence){
-    showReplayBtn(sentence);
-    setTimeout(()=>{playAudio(sentence).then(()=>{nextBtn.style.display='block';});},300);
-  }else{nextBtn.style.display='block';}
+  const nextBtn=$('nextBtn');nextBtn.textContent=qNum>=SESSION_LEN?'Результаты':'Далее';
+  if(sentence){showReplayBtn(sentence);let shown=false;const show=()=>{if(shown)return;shown=true;nextBtn.style.display='block';};setTimeout(()=>{playAudio(sentence).then(show);},300);setTimeout(show,4000);}
+  else{nextBtn.style.display='block';}
 }
 
-// ── STATS ──
+// ══ STATS ══
 function updStats(){
-  const answered=correct+wrong;
-  const accuracy=answered?Math.round((correct/answered)*100):0;
-  const pct=sessionTotal?Math.round((qNum/sessionTotal)*100):0;
-  $('correctCount').textContent=correct;
-  $('wrongCount').textContent=wrong;
-  $('streakCount').textContent=streak;
-  $('accuracyCount').textContent=`${accuracy}%`;
-  $('progressTitle').textContent=`Вопрос ${Math.min(qNum,sessionTotal)} из ${sessionTotal}`;
-  $('progressText').textContent=`${Math.min(qNum,sessionTotal)} / ${sessionTotal}`;
-  $('progressPercent').textContent=`${pct}%`;
-  $('progressFill').style.width=`${pct}%`;
-  const now=Date.now();
-  const due=Object.values(skillState).filter(s=>s.lastReview>0&&s.nextReview<=now).length;
-  const mastered=Object.values(skillState).filter(s=>s.done).length;
-  const totalSkills=Object.keys(skillState).length;
-  $('sessionMeta').textContent=`Пакет: ${getPackLabel()} · Освоено: ${mastered}/${totalSkills} · На повторение: ${due}`;
-  renderXpBar();
+  const answered=correct+wrong;const accuracy=answered?Math.round((correct/answered)*100):0;
+  const pct=Math.round((qNum/SESSION_LEN)*100);
+  $('correctCount').textContent=correct;$('wrongCount').textContent=wrong;$('streakCount').textContent=streak;$('accuracyCount').textContent=`${accuracy}%`;
+  $('progressTitle').textContent=`Вопрос ${Math.min(qNum,SESSION_LEN)} из ${SESSION_LEN}`;
+  $('progressText').textContent=`${Math.min(qNum,SESSION_LEN)} / ${SESSION_LEN}`;
+  $('progressPercent').textContent=`${pct}%`;$('progressFill').style.width=`${pct}%`;
+  const st=getStage(currentStage);const m=getStageMastered();const t=getStageTotal();
+  $('sessionMeta').textContent=`Stage ${currentStage}: ${st.label} · ${m}/${t} освоено`;
 }
 
-function renderPackSelector(){
-  let host=$('sessionPackTabs');
-  if(!host){
-    host=document.createElement('div');
-    host.id='sessionPackTabs';
-    host.className='session-pack-tabs';
-    const header=document.querySelector('#gameScreen .header');
-    if(header)header.insertAdjacentElement('afterend', host);
-  }
-  host.innerHTML='';
-  SESSION_PACKS.forEach(pack=>{
-    const btn=document.createElement('button');
-    btn.className='study-tab session-pack-tab'+(pack.id===activePackId?' active':'');
-    btn.type='button';
-    btn.textContent=pack.label;
-    btn.title=pack.note||'';
-    btn.addEventListener('click',()=>{
-      if(pack.id===activePackId)return;
-      activePackId=pack.id;
-      sessionTotal=calcSessionTotal();
-      renderPackSelector();
-      showToast(`Пакет: ${pack.label}`);
-      startGame(false);
-    });
-    host.appendChild(btn);
-  });
-}
-
-// ── PAUSE ──
-function openPauseModal(){$('pauseModal').classList.add('show');}
-function closePauseModal(){$('pauseModal').classList.remove('show');}
-function restartFromPause(){closePauseModal();startGame(false);}
-function goHomeFromPause(){closePauseModal();saveProgress();showScr('startScreen');checkSaved();renderStartScreenBadges();refreshHeatmaps();}
-
-// ── RESULTS ──
+// ═══════════════════════════════════════════
+// ══ RESULTS ══
+// ═══════════════════════════════════════════
 function showResults(){
   showScr('resultScreen');
   const answered=correct+wrong;const pct=answered?Math.round((correct/answered)*100):0;
-  $('resultCorrect').textContent=correct;$('resultWrong').textContent=wrong;
-  $('resultBest').textContent=best;$('resultPercent').textContent=`${pct}% точность · ${answered} ответов`;
-  let e='🎉',t='Отличный результат!',s='Ты уверенно считаешь по-эстонски!';
-  if(pct<40){e='📚';t='Нужна практика';s='Числа запомнятся с повторением.';}
-  else if(pct<70){e='💪';t='Хорошее начало';s='Ещё одна сессия — и числа улягутся.';}
-  else if(pct<90){e='🔥';t='Очень хорошо!';s='Числа уже почти в автоматизме.';}
-  $('resultEmoji').textContent=e;$('resultTitle').textContent=t;$('resultSubtitle').textContent=s;
+  $('resultCorrect').textContent=correct;$('resultWrong').textContent=wrong;$('resultBest').textContent=best;
+  $('resultPercent').textContent=`${pct}% точность · ${answered} ответов`;
   setTimeout(()=>{$('resultBarFill').style.width=`${pct}%`;},140);
-  gamifyOnSessionEnd();renderResultBadges();refreshHeatmaps();checkSaved();
+
+  const st=getStage(currentStage);const m=getStageMastered();const t=getStageTotal();const complete=m===t;
+  $('resultEmoji').textContent='';
+  $('resultTitle').textContent=`Stage ${currentStage}: ${st.label}`;
+  $('resultSubtitle').textContent=complete?`Все ${t} навыков освоены!`:`Освоено: ${m} из ${t}`;
+  renderResultProgress(m,t,complete);saveProgress();
 }
 
-// ═══════════════════════════════════════════
-// ── GAMIFICATION
-// ═══════════════════════════════════════════
-const GAMIFY_KEY='numbrid_gamify';
-const XP_TABLE={choice:10,build:20,typing:30,dictation:35};
-const BADGES=[
-  {id:'first_session',icon:'🌱',name:'Первые шаги',desc:'Заверши первую сессию',check:g=>g.sessionsCompleted>=1},
-  {id:'streak_5',icon:'🔥',name:'Разогрев',desc:'5 подряд',check:g=>g.bestSessionStreak>=5},
-  {id:'streak_10',icon:'⚡',name:'Молния',desc:'10 подряд',check:g=>g.bestSessionStreak>=10},
-  {id:'xp_100',icon:'⭐',name:'Сотня XP',desc:'Набери 100 XP',check:g=>g.xp>=100},
-  {id:'xp_500',icon:'🌟',name:'Полтысячи',desc:'Набери 500 XP',check:g=>g.xp>=500},
-  {id:'xp_1000',icon:'💎',name:'Тысячник',desc:'1000 XP',check:g=>g.xp>=1000},
-  {id:'daily_3',icon:'📅',name:'3 дня подряд',desc:'Занимайся 3 дня',check:g=>g.dailyStreak>=3},
-  {id:'daily_7',icon:'🏆',name:'Неделя!',desc:'7 дней подряд',check:g=>g.dailyStreak>=7},
-  {id:'correct_50',icon:'📝',name:'Полсотни',desc:'50 верных',check:g=>g.totalCorrect>=50},
-  {id:'correct_200',icon:'📚',name:'Книжный червь',desc:'200 верных',check:g=>g.totalCorrect>=200},
-  {id:'perfect',icon:'💯',name:'Идеально!',desc:'Сессия без ошибок',check:g=>g.hadPerfectSession},
-  {id:'all_card',icon:'🔢',name:'Все числа',desc:'Освой все количественные',check:g=>{
-    return NUMBERS.every(num=>skillState[`n${num.n}_card`]?.done);
-  }},
-  {id:'all_ord',icon:'🏅',name:'Все порядковые',desc:'Освой все порядковые',check:g=>{
-    return numsWithOrd().every(num=>skillState[`n${num.n}_ord`]?.done);
-  }},
-];
+function renderResultProgress(mastered,total,complete){
+  let c=$('resultProgress');
+  if(!c){c=document.createElement('div');c.id='resultProgress';c.style.cssText='width:100%;margin-top:16px;';const hb=$('homeBtn');if(hb)hb.parentNode.insertBefore(c,hb.nextSibling);}
+  const skills=getStageSkills();
+  const box0=skills.filter(([_,s])=>s.box===0).length;
+  const box1=skills.filter(([_,s])=>s.box===1).length;
+  const box2=skills.filter(([_,s])=>s.box===2).length;
+  const pct=total>0?Math.round((mastered/total)*100):0;
 
-let gamifyState=null;
-function initGamify(){
-  const saved=loadGamify();
-  gamifyState=saved||{xp:0,level:1,dailyStreak:0,lastPracticeDate:null,bestDailyStreak:0,sessionsCompleted:0,bestSessionStreak:0,totalCorrect:0,totalWrong:0,hadPerfectSession:false,earnedBadges:[]};
-  updateDailyStreak();
-}
-function loadGamify(){try{const r=localStorage.getItem(GAMIFY_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
-function saveGamify(){try{localStorage.setItem(GAMIFY_KEY,JSON.stringify(gamifyState));}catch(e){}}
-function todayStr(){return new Date().toISOString().split('T')[0];}
-function updateDailyStreak(){
-  if(!gamifyState.lastPracticeDate)return;
-  const today=todayStr();if(gamifyState.lastPracticeDate===today)return;
-  const y=new Date();y.setDate(y.getDate()-1);
-  if(gamifyState.lastPracticeDate<y.toISOString().split('T')[0])gamifyState.dailyStreak=0;
-  saveGamify();
-}
-function recordPracticeToday(){
-  const today=todayStr();
-  if(gamifyState.lastPracticeDate!==today){
-    gamifyState.dailyStreak++;
-    if(gamifyState.dailyStreak>gamifyState.bestDailyStreak)gamifyState.bestDailyStreak=gamifyState.dailyStreak;
-    gamifyState.lastPracticeDate=today;saveGamify();
-  }
-}
-function getTotalXpForLevel(l){let t=0;for(let i=1;i<l;i++)t+=i*50+(i-1)*20;return t;}
-function addXp(amount){
-  gamifyState.xp+=amount;
-  while(gamifyState.xp>=getTotalXpForLevel(gamifyState.level+1)){gamifyState.level++;showToast(`🎉 Уровень ${gamifyState.level}!`);}
-  saveGamify();
-}
-function gamifyOnAnswer(ok,type){
-  recordPracticeToday();
-  if(ok){addXp((XP_TABLE[type]||10)+Math.min(streak,10)*2);gamifyState.totalCorrect++;}
-  else{gamifyState.totalWrong++;}
-  if(streak>gamifyState.bestSessionStreak)gamifyState.bestSessionStreak=streak;
-  checkNewBadges();saveGamify();
-}
-function gamifyOnSessionEnd(){
-  gamifyState.sessionsCompleted++;
-  if(wrong===0&&correct>=10)gamifyState.hadPerfectSession=true;
-  checkNewBadges();saveGamify();
-}
-function checkNewBadges(){
-  BADGES.forEach(b=>{
-    if(!gamifyState.earnedBadges.includes(b.id)&&b.check(gamifyState)){
-      gamifyState.earnedBadges.push(b.id);showToast(`${b.icon} ${b.name}!`);
-    }
-  });
-}
-
-function renderXpBar(){
-  let bar=$('xpBarWidget');
-  if(!bar){bar=document.createElement('div');bar.id='xpBarWidget';
-    bar.style.cssText='margin-bottom:14px;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);';
-    const stats=document.querySelector('.stats');if(stats)stats.parentNode.insertBefore(bar,stats.nextSibling);
-  }
-  const g=gamifyState;const cur=getTotalXpForLevel(g.level);const nxt=getTotalXpForLevel(g.level+1);
-  const pct=nxt>cur?((g.xp-cur)/(nxt-cur))*100:100;
-  bar.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:.78rem;font-weight:800;">⭐ Уровень ${g.level}</span>
-    <span style="font-size:.72rem;font-family:'DM Mono',monospace;color:var(--text-dim);">${g.xp} XP${g.dailyStreak>0?' · 🔥 '+g.dailyStreak+' д.':''}</span>
-  </div><div style="height:6px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;">
-    <div style="height:100%;width:${Math.min(pct,100)}%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .4s;"></div></div>`;
-}
-
-function renderResultBadges(){
-  let c=$('resultBadges');
-  if(!c){c=document.createElement('div');c.id='resultBadges';c.style.cssText='width:100%;margin-top:12px;';
-    const rp=$('resultPercent');if(rp)rp.parentNode.insertBefore(c,rp.nextSibling);}
-  const g=gamifyState;const earned=BADGES.filter(b=>g.earnedBadges.includes(b.id));
-  c.innerHTML=`<div style="padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);text-align:center;">
-    <div style="font-size:.78rem;font-weight:700;margin-bottom:8px;">⭐ Уровень ${g.level} · ${g.xp} XP · 🔥 ${g.dailyStreak} д.</div>
-    ${earned.length?`<div style="display:flex;flex-wrap:wrap;justify-content:center;gap:8px;">${earned.map(b=>`<span title="${b.name}: ${b.desc}" style="font-size:1.5rem;">${b.icon}</span>`).join('')}</div>`:'<div style="font-size:.8rem;color:var(--text-dim);">Продолжай — первые достижения уже близко!</div>'}
+  c.innerHTML=`<div style="padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:.82rem;font-weight:800;">Прогресс Stage ${currentStage}</span>
+      <span style="font-size:.78rem;font-family:'DM Mono',monospace;color:var(--text-dim);">${mastered}/${total}</span>
+    </div>
+    <div style="height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;margin-bottom:12px;">
+      <div style="height:100%;width:${pct}%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .6s;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;">
+      <div style="padding:8px;border-radius:10px;background:rgba(255,107,122,.1);border:1px solid rgba(255,107,122,.18);">
+        <div style="font-size:1.1rem;font-weight:900;color:var(--danger);">${box0}</div>
+        <div style="font-size:.65rem;color:var(--text-dim);font-family:'DM Mono',monospace;">новых</div>
+      </div>
+      <div style="padding:8px;border-radius:10px;background:rgba(255,204,102,.1);border:1px solid rgba(255,204,102,.18);">
+        <div style="font-size:1.1rem;font-weight:900;color:var(--warning);">${box1}</div>
+        <div style="font-size:.65rem;color:var(--text-dim);font-family:'DM Mono',monospace;">учу</div>
+      </div>
+      <div style="padding:8px;border-radius:10px;background:rgba(6,214,160,.12);border:1px solid rgba(6,214,160,.2);">
+        <div style="font-size:1.1rem;font-weight:900;color:var(--success);">${box2}</div>
+        <div style="font-size:.65rem;color:var(--text-dim);font-family:'DM Mono',monospace;">освоено</div>
+      </div>
+    </div>
+    ${complete&&currentStage<STAGES.length?`<div style="margin-top:12px;"><button class="btn btn-primary" id="nextStageBtn" style="font-size:.95rem;">Начать Stage ${currentStage+1}: ${getStage(currentStage+1).label}</button></div>`:''}
+    ${complete&&currentStage>=STAGES.length?`<div style="margin-top:12px;text-align:center;font-size:.9rem;font-weight:700;color:var(--success);">Все этапы пройдены!</div>`:''}
   </div>`;
+  const nsBtn=$('nextStageBtn');
+  if(nsBtn)nsBtn.addEventListener('click',()=>{currentStage++;saveProgress();startGame();});
 }
 
 // ═══════════════════════════════════════════
-// ── ANALYTICS (Heatmap)
+// ══ START SCREEN ══
 // ═══════════════════════════════════════════
-function getSkillStrength(sk){
-  if(!sk||sk.lastReview===0)return-1;
-  const ratio=sk.totalCorrect+sk.totalWrong>0?sk.totalCorrect/(sk.totalCorrect+sk.totalWrong):0;
-  const efS=(sk.ef-1.3)/(2.5-1.3);const lvlS=sk.level/MAXLVL;const repS=Math.min(sk.reps/5,1);
-  return Math.round(ratio*30+efS*25+lvlS*25+repS*20);
-}
-function sColor(s){
-  if(s<0)return'rgba(255,255,255,.04)';if(s<25)return'rgba(255,107,122,.35)';
-  if(s<50)return'rgba(255,204,102,.30)';if(s<75)return'rgba(14,165,233,.25)';return'rgba(6,214,160,.30)';
-}
-function sBorder(s){
-  if(s<0)return'rgba(255,255,255,.06)';if(s<25)return'rgba(255,107,122,.4)';
-  if(s<50)return'rgba(255,204,102,.35)';if(s<75)return'rgba(14,165,233,.3)';return'rgba(6,214,160,.35)';
+function renderStartScreen(){
+  const save=loadProgress();
+  if(save){skillState=save.skillState;currentStage=save.currentStage||1;if(isStageComplete(currentStage)&&currentStage<STAGES.length)currentStage=getMaxUnlockedStage();}
+  else{initSkills();currentStage=1;}
+  const st=getStage(currentStage);const m=getStageMastered();const t=getStageTotal();
+  $('startBtn').textContent=m>0?`Продолжить · ${m}/${t} освоено`:`Начать Stage ${currentStage}`;
+  renderStageIndicator();
 }
 
-function renderHeatmap(containerId){
-  const c=$(containerId);if(!c)return;
-  const anyReviewed=Object.values(skillState).some(s=>s.lastReview>0);
-  if(!anyReviewed){c.innerHTML=`<div style="padding:16px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);text-align:center;">
-    <div style="font-size:.82rem;color:var(--text-dim);">Пройди хотя бы одну сессию — и здесь появится карта знаний</div></div>`;return;}
-
-  // Group: 1-10 (card+ord+sent), 11-19 (card+sent), tens (card only)
-  let html=`<div style="padding:16px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);">
-    <div style="font-size:.78rem;font-weight:800;margin-bottom:12px;">📊 Карта знаний</div>
-    <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;">
-    <div></div><div style="text-align:center;color:var(--text-dim);font-weight:600;font-size:.65rem;">Число</div>
-    <div style="text-align:center;color:var(--text-dim);font-weight:600;font-size:.65rem;">Поряд.</div>
-    <div style="text-align:center;color:var(--text-dim);font-weight:600;font-size:.65rem;">Предл.</div>`;
-
-  nums1to10().forEach(num=>{
-    const cs=getSkillStrength(skillState[`n${num.n}_card`]);
-    const os=getSkillStrength(skillState[`n${num.n}_ord`]);
-    const ss=getSkillStrength(skillState[`n${num.n}_sent`]);
-    html+=`<div style="padding:6px 8px;font-weight:700;font-size:.8rem;">${num.n}</div>`;
-    [cs,os,ss].forEach(s=>{
-      html+=`<div style="padding:6px;text-align:center;border-radius:8px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-weight:700;font-size:.78rem;">${s>=0?s:'—'}</div>`;
-    });
+function renderStageIndicator(){
+  let host=$('stageIndicator');
+  if(!host){host=document.createElement('div');host.id='stageIndicator';host.style.cssText='width:100%;margin-top:4px;';const info=document.querySelector('.start-info');if(info)info.parentNode.insertBefore(host,info);}
+  const maxU=getMaxUnlockedStage();
+  let html='<div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">';
+  STAGES.forEach(stage=>{
+    const locked=stage.id>maxU;const complete=isStageComplete(stage.id);const active=stage.id===currentStage;
+    const m=getStageMastered(stage.id);const t=getStageTotal(stage.id);
+    let bg,border,color;
+    if(complete){bg='rgba(6,214,160,.15)';border='rgba(6,214,160,.3)';color='var(--success)';}
+    else if(active){bg='rgba(14,165,233,.12)';border='rgba(14,165,233,.3)';color='var(--accent-2)';}
+    else if(locked){bg='rgba(255,255,255,.02)';border='rgba(255,255,255,.06)';color='var(--text-dim)';}
+    else{bg='rgba(255,255,255,.04)';border='rgba(255,255,255,.08)';color='var(--text)';}
+    html+=`<div style="padding:8px 12px;border-radius:10px;background:${bg};border:1px solid ${border};text-align:center;min-width:65px;${locked?'opacity:.4;':''}">
+      <div style="font-size:.72rem;font-weight:800;color:${color};">${locked?'🔒':complete?'✓':stage.id}</div>
+      <div style="font-size:.6rem;color:var(--text-dim);font-family:'DM Mono',monospace;margin-top:2px;">${locked?'—':`${m}/${t}`}</div>
+    </div>`;
   });
-  html+=`</div>`;
-
-  // 11-19 grid (card + ord + sent)
-  html+=`<div style="margin-top:12px;font-size:.72rem;font-weight:700;color:var(--text-dim);margin-bottom:6px;">11–19:</div>
-    <div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;">
-    <div></div><div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Число</div>
-    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Поряд.</div>
-    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Предл.</div>`;
-  nums11to19().forEach(num=>{
-    const cs=getSkillStrength(skillState[`n${num.n}_card`]);
-    const os=getSkillStrength(skillState[`n${num.n}_ord`]);
-    const ss=getSkillStrength(skillState[`n${num.n}_sent`]);
-    html+=`<div style="padding:4px 6px;font-weight:700;font-size:.75rem;">${num.n}</div>`;
-    [cs,os,ss].forEach(s=>{
-      html+=`<div style="padding:4px;text-align:center;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-weight:700;font-size:.72rem;">${s>=0?s:'—'}</div>`;
-    });
-  });
-  html+=`</div>`;
-
-  // Tens grid (card + ord)
-  html+=`<div style="margin-top:12px;font-size:.72rem;font-weight:700;color:var(--text-dim);margin-bottom:6px;">Десятки:</div>
-    <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;">
-    <div></div><div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Число</div>
-    <div style="text-align:center;color:var(--text-dim);font-size:.6rem;">Поряд.</div>`;
-  numsTens().forEach(num=>{
-    const cs=getSkillStrength(skillState[`n${num.n}_card`]);
-    const os=getSkillStrength(skillState[`n${num.n}_ord`]);
-    html+=`<div style="padding:4px 6px;font-weight:700;font-size:.75rem;">${num.n}</div>`;
-    [cs,os].forEach(s=>{
-      html+=`<div style="padding:4px;text-align:center;border-radius:6px;background:${sColor(s)};border:1px solid ${sBorder(s)};font-weight:700;font-size:.72rem;">${s>=0?s:'—'}</div>`;
-    });
-  });
-  html+=`</div>`;
-
-  // Legend
-  html+=`<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;justify-content:center;">
-    <span style="font-size:.65rem;color:var(--text-dim);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(255,107,122,.35);vertical-align:middle;"></span> Слабо</span>
-    <span style="font-size:.65rem;color:var(--text-dim);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(255,204,102,.30);vertical-align:middle;"></span> Средне</span>
-    <span style="font-size:.65rem;color:var(--text-dim);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(14,165,233,.25);vertical-align:middle;"></span> Хорошо</span>
-    <span style="font-size:.65rem;color:var(--text-dim);"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:rgba(6,214,160,.30);vertical-align:middle;"></span> Сильно</span>
-  </div></div>`;
-
-  c.innerHTML=html;
+  html+='</div>';host.innerHTML=html;
 }
 
-function injectHeatmapContainers(){
-  if(!$('startHeatmap')){const el=document.createElement('div');el.id='startHeatmap';el.style.cssText='width:100%;margin-top:12px;';
-    const sb=$('startBadges');if(sb)sb.parentNode.insertBefore(el,sb.nextSibling);
-    else{const i=document.querySelector('.start-info');if(i)i.parentNode.insertBefore(el,i);}}
-  if(!$('resultHeatmap')){const el=document.createElement('div');el.id='resultHeatmap';el.style.cssText='width:100%;margin-top:12px;';
-    const rb=$('resultBadges');if(rb)rb.parentNode.insertBefore(el,rb.nextSibling);
-    else{const rp=$('resultPercent');if(rp)rp.parentNode.insertBefore(el,rp.nextSibling);}}
-}
-function refreshHeatmaps(){injectHeatmapContainers();renderHeatmap('startHeatmap');renderHeatmap('resultHeatmap');}
+// ══ PAUSE ══
+function openPauseModal(){$('pauseModal').classList.add('show');}
+function closePauseModal(){$('pauseModal').classList.remove('show');}
+function goHomeFromPause(){closePauseModal();saveProgress();showScr('startScreen');renderStartScreen();}
+function restartFromPause(){closePauseModal();startGame();}
 
 // ═══════════════════════════════════════════
-// ── LOOK-HIDE-WRITE DRILL (Testing Effect)
+// ══ DRILL ══
 // ═══════════════════════════════════════════
-
-let drillTimer = null;
-
-function openDrill(word, audioText, label, sublabel) {
-  stopAudio();
-  const overlay = $('drillOverlay');
-  const phase = $('drillPhase');
-  overlay.classList.add('show');
-
-  let correctInRow = 0;
-  const NEEDED = 2;
-
-  showPhase();
-
-  function showPhase() {
-    //const showTime = correctInRow === 0 ? 4000 : 2500;
-    const showTime = correctInRow === 0 ? 1000004000 : 2500;
-    phase.innerHTML = `
-      <div class="drill-num">${label}</div>
-      <div class="drill-ru">${sublabel}</div>
-      <div class="drill-hint">Запоминай написание:</div>
-      <div class="drill-word">${word}</div>
-      <div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div>
-      <div class="drill-streak-dots">
-        ${Array.from({length: NEEDED}, (_, i) =>
-          `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
-        ).join('')}
-      </div>
-      <div style="font-size:.75rem;color:var(--text-dim);font-family:'DM Mono',monospace;">
-        ${correctInRow > 0 ? `✓ ${correctInRow}/${NEEDED} — ещё ${NEEDED - correctInRow}!` : `Напиши правильно ${NEEDED} раза подряд`}
-      </div>
-    `;
-
-    playAudio(audioText);
-
-    const fill = $('drillTimerFill');
-    if (fill) {
-      fill.style.width = '100%';
-      fill.style.transitionDuration = showTime + 'ms';
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => { fill.style.width = '0%'; });
-      });
-    }
-
-    drillTimer = setTimeout(() => writePhase(), showTime);
-  }
-
-  function writePhase() {
-    phase.innerHTML = `
-      <div class="drill-num">${label}</div>
-      <div class="drill-ru">${sublabel}</div>
-      <div class="drill-hint">Напиши по памяти:</div>
-      <div class="drill-streak-dots">
-        ${Array.from({length: NEEDED}, (_, i) =>
-          `<div class="drill-streak-dot ${i < correctInRow ? 'filled' : ''}"></div>`
-        ).join('')}
-      </div>
-      <div style="margin-top:12px;">
-        <input type="text" class="drill-input" id="drillInput" placeholder="..." autocomplete="off" spellcheck="false" />
-      </div>
-    `;
-
-    const inp = $('drillInput');
-    setTimeout(() => inp.focus(), 100);
-
-    function check() {
-      const val = normalize(inp.value);
-      if (!val) return;
-
-      const ok = val === normalize(word);
-      inp.disabled = true;
-
-      if (ok) {
-        inp.classList.add('correct');
-        correctInRow++;
-
-        if (correctInRow >= NEEDED) {
-          setTimeout(() => successPhase(), 500);
-        } else {
-          setTimeout(() => showPhase(), 800);
-        }
-      } else {
-        inp.classList.add('wrong');
-        correctInRow = 0;
-
-        setTimeout(() => {
-          phase.innerHTML = `
-            <div class="drill-num">${label}</div>
-            <div class="drill-hint" style="color:var(--danger);">Не совсем. Правильно:</div>
-            <div class="drill-word">${word}</div>
-            <div class="drill-streak-dots">
-              ${Array.from({length: NEEDED}, () =>
-                `<div class="drill-streak-dot"></div>`
-              ).join('')}
-            </div>
-            <div style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Смотри внимательно...</div>
-          `;
-          playAudio(audioText);
-          drillTimer = setTimeout(() => showPhase(), 3000);
-        }, 600);
-      }
-    }
-
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
-  }
-
-  function successPhase() {
-    playAudio(audioText);
-    phase.innerHTML = `
-      <div class="drill-num">${label}</div>
-      <div class="drill-success">✓ Запомнил!</div>
-      <div class="drill-word" style="color:var(--success);">${word}</div>
-      <div class="drill-streak-dots">
-        ${Array.from({length: NEEDED}, () =>
-          `<div class="drill-streak-dot filled"></div>`
-        ).join('')}
-      </div>
-      <div style="margin-top:16px;">
-        <button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">Отлично!</button>
-      </div>
-    `;
-    $('drillDoneBtn').addEventListener('click', closeDrill);
-  }
+let drillTimer=null;
+function openDrill(word,audioText,label,sublabel){
+  stopAudio();$('drillOverlay').classList.add('show');const phase=$('drillPhase');
+  let cir=0;const NEEDED=3;
+  function showP(){const showTime=cir===0?4000:2500;
+    phase.innerHTML=`<div class="drill-num">${label}</div><div class="drill-ru">${sublabel}</div><div class="drill-hint">Запоминай написание:</div><div class="drill-word">${word}</div><div class="drill-timer"><div class="drill-timer-fill" id="drillTimerFill"></div></div><div class="drill-streak-dots">${Array.from({length:NEEDED},(_,i)=>`<div class="drill-streak-dot ${i<cir?'filled':''}"></div>`).join('')}</div><div style="font-size:.75rem;color:var(--text-dim);font-family:'DM Mono',monospace;">${cir>0?`✓ ${cir}/${NEEDED}`:`Напиши правильно ${NEEDED} раза подряд`}</div>`;
+    playAudio(audioText);const fill=$('drillTimerFill');if(fill){fill.style.width='100%';fill.style.transitionDuration=showTime+'ms';requestAnimationFrame(()=>requestAnimationFrame(()=>{fill.style.width='0%';}));}
+    drillTimer=setTimeout(writeP,showTime);}
+  function writeP(){
+    phase.innerHTML=`<div class="drill-num">${label}</div><div class="drill-ru">${sublabel}</div><div class="drill-hint">Напиши по памяти:</div><div class="drill-streak-dots">${Array.from({length:NEEDED},(_,i)=>`<div class="drill-streak-dot ${i<cir?'filled':''}"></div>`).join('')}</div><div style="margin-top:12px;"><input type="text" class="drill-input" id="drillInput" placeholder="..." autocomplete="off" spellcheck="false"/></div><div style="margin-top:10px;"><button class="btn btn-primary" id="drillCheckBtn" style="padding:12px 20px;font-size:.95rem;">Проверить</button></div>`;
+    const inp=$('drillInput');setTimeout(()=>inp.focus(),100);
+    function chk(){const val=normalize(inp.value);if(!val)return;const ok=val===normalize(word);inp.disabled=true;$('drillCheckBtn').style.display='none';
+      if(ok){inp.classList.add('correct');cir++;if(cir>=NEEDED)setTimeout(succP,500);else setTimeout(showP,800);}
+      else{inp.classList.add('wrong');cir=0;setTimeout(()=>{phase.innerHTML=`<div class="drill-num">${label}</div><div class="drill-hint" style="color:var(--danger);">Не совсем. Правильно:</div><div class="drill-word">${word}</div><div class="drill-streak-dots">${Array.from({length:NEEDED},()=>`<div class="drill-streak-dot"></div>`).join('')}</div><div style="font-size:.78rem;color:var(--text-dim);margin-top:8px;">Смотри внимательно...</div>`;playAudio(audioText);drillTimer=setTimeout(showP,3000);},600);}}
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')chk();});
+    $('drillCheckBtn').addEventListener('click',chk);}
+  function succP(){playAudio(audioText);phase.innerHTML=`<div class="drill-num">${label}</div><div class="drill-success">✓ Запомнил!</div><div class="drill-word" style="color:var(--success);">${word}</div><div class="drill-streak-dots">${Array.from({length:NEEDED},()=>`<div class="drill-streak-dot filled"></div>`).join('')}</div><div style="margin-top:16px;"><button class="btn btn-primary" id="drillDoneBtn" style="padding:14px 20px;">Отлично!</button></div>`;$('drillDoneBtn').addEventListener('click',closeDrill);}
+  showP();
 }
-
-function closeDrill() {
-  if (drillTimer) { clearTimeout(drillTimer); drillTimer = null; }
-  stopAudio();
-  $('drillOverlay').classList.remove('show');
-  $('drillPhase').innerHTML = '';
-}
+function closeDrill(){if(drillTimer){clearTimeout(drillTimer);drillTimer=null;}stopAudio();$('drillOverlay').classList.remove('show');$('drillPhase').innerHTML='';}
 
 // ═══════════════════════════════════════════
-// ── STUDY MODE (interactive reference cards)
+// ══ STUDY MODE ══
 // ═══════════════════════════════════════════
+function nums1to10(){return NUMBERS.filter(x=>x.n>=1&&x.n<=10);}
+function nums11to19(){return NUMBERS.filter(x=>x.n>=11&&x.n<=19);}
+function numsTens(){return NUMBERS.filter(x=>x.n>=20);}
 
-function renderStudy() {
-  const c = $('studyContent');
-  c.innerHTML = '';
+function renderStudy(){
+  const c=$('studyContent');c.innerHTML='';
+  const tabs=[{id:'tab1',label:'1–10'},{id:'tab2',label:'11–19'},{id:'tab3',label:'20–100'},{id:'tab4',label:'Примеры'}];
+  const tabBar=document.createElement('div');tabBar.style.cssText='display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
+  const panels={};
+  tabs.forEach((tab,i)=>{
+    const btn=document.createElement('button');btn.className='study-tab';btn.textContent=tab.label;if(i===0)btn.classList.add('active');
+    btn.addEventListener('click',()=>{stopAudio();tabBar.querySelectorAll('.study-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');Object.values(panels).forEach(p=>p.style.display='none');panels[tab.id].style.display='';});
+    tabBar.appendChild(btn);const panel=document.createElement('div');panel.style.display=i===0?'':'none';panels[tab.id]=panel;});
+  c.appendChild(tabBar);Object.values(panels).forEach(p=>c.appendChild(p));
+  function makeCard(num,showOrd){const card=document.createElement('div');card.className='study-card';card.innerHTML=`<div class="sc-num">${num.n}</div><div class="sc-et">${num.et}</div><div class="sc-ru">${num.ru}</div>${showOrd&&num.ord?`<div class="sc-ord">${num.ord} (${num.ordRu})</div>`:''}`;card.addEventListener('click',()=>openDrill(num.et,num.et,String(num.n),num.ru));if(showOrd&&num.ord)card.addEventListener('contextmenu',e=>{e.preventDefault();openDrill(num.ord,num.ord,`${num.n}-й`,num.ordRu);});return card;}
+  function makeSentenceRow(num,noun){const s=makeSentence(num,noun);const row=document.createElement('div');row.className='study-sentence';row.innerHTML=`<span class="ss-et">${s.et}</span><span class="ss-ru">${s.ru}</span>`;row.addEventListener('click',()=>openDrill(s.et,s.et,s.ru,''));return row;}
 
-  // ── TAB BAR ──
-  const tabs = [
-    { id: 'tab1', label: '1–10' },
-    { id: 'tab2', label: '11–19' },
-    { id: 'tab3', label: '20–100' },
-    { id: 'tab4', label: 'Примеры' },
-  ];
+  const p1=panels['tab1'];const g1=document.createElement('div');g1.className='study-grid';nums1to10().forEach(n=>g1.appendChild(makeCard(n,true)));p1.appendChild(g1);
+  const n1=document.createElement('div');n1.className='study-note';n1.innerHTML=`<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й). Образуются по-разному — нужно запоминать каждое.`;p1.appendChild(n1);
 
-  const tabBar = document.createElement('div');
-  tabBar.style.cssText = 'display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
+  const p2=panels['tab2'];const g2=document.createElement('div');g2.className='study-grid';nums11to19().forEach(n=>g2.appendChild(makeCard(n,true)));p2.appendChild(g2);
+  const n2=document.createElement('div');n2.className='study-note';n2.innerHTML=`<strong>Количественные:</strong> корень+<strong>teist</strong><br>üks→üks<strong>teist</strong>, kaks→kaks<strong>teist</strong><br><br><strong>Порядковые:</strong> корень+<strong>teistkümnes</strong><br>ühe<strong>teistkümnes</strong>, kahe<strong>teistkümnes</strong>... (корень меняется!)`;p2.appendChild(n2);
 
-  const panels = {};
+  const p3=panels['tab3'];const g3=document.createElement('div');g3.className='study-grid';numsTens().forEach(n=>g3.appendChild(makeCard(n,true)));p3.appendChild(g3);
+  const n3=document.createElement('div');n3.className='study-note';n3.innerHTML=`<strong>Количественные:</strong> корень+<strong>kümmend</strong><br>kaks<strong>kümmend</strong>, kolm<strong>kümmend</strong>...<br><br><strong>Порядковые:</strong> корень+<strong>kümnes</strong><br>kahe<strong>kümnes</strong>, kolme<strong>kümnes</strong>...<br>Исключение: 100=<strong>sada</strong>→<strong>sajas</strong>`;p3.appendChild(n3);
 
-  tabs.forEach((tab, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'study-tab';
-    btn.textContent = tab.label;
-    btn.dataset.tab = tab.id;
-    if (i === 0) btn.classList.add('active');
-    btn.addEventListener('click', () => {
-      stopAudio();
-      tabBar.querySelectorAll('.study-tab').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      Object.values(panels).forEach(p => p.style.display = 'none');
-      panels[tab.id].style.display = '';
-    });
-    tabBar.appendChild(btn);
+  const p4=panels['tab4'];const n4=document.createElement('div');n4.className='study-note';n4.innerHTML=`<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass). После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)`;p4.appendChild(n4);
+  const sw=document.createElement('div');sw.className='study-sentence-grid';
+  [{n:1,noun:NOUNS[0]},{n:3,noun:NOUNS[0]},{n:1,noun:NOUNS[2]},{n:5,noun:NOUNS[2]},{n:1,noun:NOUNS[1]},{n:7,noun:NOUNS[1]},{n:1,noun:NOUNS[3]},{n:12,noun:NOUNS[3]}].forEach(({n,noun})=>sw.appendChild(makeSentenceRow(getNum(n),noun)));p4.appendChild(sw);
+}
+function openStudy(){renderStudy();showScr('studyScreen');}
 
-    const panel = document.createElement('div');
-    panel.style.display = i === 0 ? '' : 'none';
-    panels[tab.id] = panel;
-  });
-
-  c.appendChild(tabBar);
-  Object.values(panels).forEach(p => c.appendChild(p));
-
-  // Helper: create a number card
-  function makeCard(num, showOrd) {
-    const card = document.createElement('div');
-    card.className = 'study-card';
-    card.innerHTML = `
-      <div class="sc-num">${num.n}</div>
-      <div class="sc-et">${num.et}</div>
-      <div class="sc-ru">${num.ru}</div>
-      ${showOrd && num.ord ? `<div class="sc-ord">${num.ord} (${num.ordRu})</div>` : ''}
-    `;
-    card.addEventListener('click', () => {
-      openDrill(num.et, num.et, String(num.n), num.ru);
-    });
-    if (showOrd && num.ord) {
-      card.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        openDrill(num.ord, num.ord, `${num.n}-й`, num.ordRu);
-      });
-    }
-    return card;
-  }
-
-  // Helper: create a sentence row
-  function makeSentenceRow(num, noun) {
-    const s = makeSentence(num, noun);
-    const row = document.createElement('div');
-    row.className = 'study-sentence';
-    row.innerHTML = `<span class="ss-et">${s.et}</span><span class="ss-ru">${s.ru}</span>`;
-    row.addEventListener('click', () => {
-      openDrill(s.et, s.et, s.ru, '');
-    });
-    return row;
-  }
-
-  // ── TAB 1: 1–10 ──
-  const p1 = panels['tab1'];
-  const grid1 = document.createElement('div');
-  grid1.className = 'study-grid';
-  nums1to10().forEach(num => grid1.appendChild(makeCard(num, true)));
-  p1.appendChild(grid1);
-
-  const note1 = document.createElement('div');
-  note1.className = 'study-note';
-  note1.innerHTML = `<strong>Порядковые:</strong> esimene (1-й), teine (2-й), kolmas (3-й)... kümnes (10-й)
-    Образуются по-разному — нужно запоминать каждое.`;
-  p1.appendChild(note1);
-
-  // ── TAB 2: 11–19 ──
-  const p2 = panels['tab2'];
-  const grid2 = document.createElement('div');
-  grid2.className = 'study-grid';
-  nums11to19().forEach(num => grid2.appendChild(makeCard(num, true)));
-  p2.appendChild(grid2);
-
-  const note2 = document.createElement('div');
-  note2.className = 'study-note';
-  note2.innerHTML = `<strong>Количественные:</strong> корень + <strong>teist</strong><br>
-    üks → üks<strong>teist</strong>, kaks → kaks<strong>teist</strong><br><br>
-    <strong>Порядковые:</strong> корень + <strong>teistkümnes</strong><br>
-    ühe<strong>teistkümnes</strong>, kahe<strong>teistkümnes</strong>... (обрати внимание — корень меняется!)`;
-  p2.appendChild(note2);
-
-  // ── TAB 3: 20–100 ──
-  const p3 = panels['tab3'];
-  const grid3 = document.createElement('div');
-  grid3.className = 'study-grid';
-  numsTens().forEach(num => grid3.appendChild(makeCard(num, true)));
-  p3.appendChild(grid3);
-
-  const note3 = document.createElement('div');
-  note3.className = 'study-note';
-  note3.innerHTML = `<strong>Количественные:</strong> корень + <strong>kümmend</strong><br>
-    kaks<strong>kümmend</strong>, kolm<strong>kümmend</strong>...<br><br>
-    <strong>Порядковые:</strong> корень + <strong>kümnes</strong><br>
-    kahe<strong>kümnes</strong>, kolme<strong>kümnes</strong>...<br>
-    Исключение: 100 = <strong>sada</strong> → <strong>sajas</strong>`;
-  p3.appendChild(note3);
-
-  // ── TAB 4: Sentences ──
-  const p4 = panels['tab4'];
-
-  const note4top = document.createElement('div');
-  note4top.className = 'study-note';
-  note4top.innerHTML = `<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass)
-    После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)`;
-  p4.appendChild(note4top);
-
-  const sentWrap = document.createElement('div');
-  sentWrap.className = 'study-sentence-grid';
-  const examples = [
-    { num: getNum(1), noun: NOUNS[0] },
-    { num: getNum(3), noun: NOUNS[0] },
-    { num: getNum(1), noun: NOUNS[2] },
-    { num: getNum(5), noun: NOUNS[2] },
-    { num: getNum(1), noun: NOUNS[1] },
-    { num: getNum(7), noun: NOUNS[1] },
-    { num: getNum(1), noun: NOUNS[3] },
-    { num: getNum(12), noun: NOUNS[3] },
-  ];
-  examples.forEach(({ num, noun }) => sentWrap.appendChild(makeSentenceRow(num, noun)));
-  p4.appendChild(sentWrap);
+// ═══════════════════════════════════════════
+// ══ FAQ ══
+// ═══════════════════════════════════════════
+function openFaq(){
+  $('faqContent').innerHTML = `
+    <div style="font-size:.88rem;line-height:1.65;color:var(--text-dim);">
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🎯 Цель</div>
+        Выучить эстонские числа от 1 до 100 — написание, произношение, порядковые формы и использование в предложениях.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📦 Три коробки</div>
+        Каждый навык проходит путь:<br>
+        <span style="color:var(--danger);font-weight:700;">Новый</span> → <span style="color:var(--warning);font-weight:700;">Учу</span> → <span style="color:var(--success);font-weight:700;">Освоен</span><br>
+        Ответь правильно <strong>2 раза подряд</strong> — навык переходит в следующую коробку. Одна ошибка — возврат в «Новый».
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔢 4 этапа</div>
+        <strong>Stage 1:</strong> числа 1–5 (15 навыков)<br>
+        <strong>Stage 2:</strong> числа 6–10 (15 навыков)<br>
+        <strong>Stage 3:</strong> числа 11–20 (29 навыков)<br>
+        <strong>Stage 4:</strong> десятки 30–100 (16 навыков)<br>
+        Следующий этап открывается только когда <strong>все</strong> навыки текущего освоены.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📝 Типы заданий</div>
+        Новые навыки → больше <strong>выбора из вариантов</strong> (помогаем запомнить).<br>
+        Освоенные навыки → только <strong>ввод и диктант</strong> (проверяем что знаешь).
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔊 Справочник</div>
+        Нажми «Изучить числа» — откроются карточки. Клик по карточке запускает мини-дрил: посмотри → запомни → напиши 3 раза.
+      </div>
+      <div>
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">💾 Прогресс</div>
+        Сохраняется автоматически в браузере. Можно закрыть вкладку и продолжить позже.
+      </div>
+    </div>`;
+  $('faqModal').classList.add('show');
 }
 
-function openStudy() {
-  renderStudy();
-  showScr('studyScreen');
-}
+function closeFaq(){ $('faqModal').classList.remove('show'); }
 
-// ── EVENTS ──
+// ═══════════════════════════════════════════
+// ══ EVENTS ══
+// ═══════════════════════════════════════════
 function bindEvents(){
-  $('startBtn').addEventListener('click',()=>startGame(false));
-  $('studyBtn').addEventListener('click', openStudy);
-  $('studyBackBtn').addEventListener('click', () => { stopAudio(); showScr('startScreen'); });
-  $('drillClose').addEventListener('click', closeDrill);
-  $('drillOverlay').addEventListener('click', e => { if (e.target.id === 'drillOverlay') closeDrill(); });
+  $('startBtn').addEventListener('click',()=>startGame());
+  $('studyBtn').addEventListener('click',openStudy);
+  $('faqBtn').addEventListener('click',openFaq);
+  $('faqCloseBtn').addEventListener('click',closeFaq);
+  $('faqModal').addEventListener('click',e=>{if(e.target.id==='faqModal')closeFaq();});
+  $('studyBackBtn').addEventListener('click',()=>{stopAudio();showScr('startScreen');renderStartScreen();});
+  $('drillClose').addEventListener('click',closeDrill);
+  $('drillOverlay').addEventListener('click',e=>{if(e.target.id==='drillOverlay')closeDrill();});
   $('pauseBtn').addEventListener('click',openPauseModal);
   $('resumeBtn').addEventListener('click',closePauseModal);
   $('restartBtn').addEventListener('click',restartFromPause);
   $('pauseHomeBtn').addEventListener('click',goHomeFromPause);
-  $('retryBtn').addEventListener('click',()=>startGame(false));
-  $('homeBtn').addEventListener('click',()=>{showScr('startScreen');checkSaved();refreshHeatmaps();});
+  $('retryBtn').addEventListener('click',()=>startGame());
+  $('homeBtn').addEventListener('click',()=>{showScr('startScreen');renderStartScreen();});
   $('nextBtn').addEventListener('click',nextQ);
   $('pauseModal').addEventListener('click',e=>{if(e.target.id==='pauseModal')closePauseModal();});
   document.addEventListener('keydown',e=>{
-    if(e.key==='Escape'){
-      if($('drillOverlay').classList.contains('show'))closeDrill();
-      else if($('pauseModal').classList.contains('show'))closePauseModal();
-      else if($('studyScreen').classList.contains('active')){stopAudio();showScr('startScreen');}
-      else if($('gameScreen').classList.contains('active'))openPauseModal();
-    }
+    if(e.key==='Escape'){if($('faqModal').classList.contains('show'))closeFaq();else if($('drillOverlay').classList.contains('show'))closeDrill();else if($('pauseModal').classList.contains('show'))closePauseModal();else if($('studyScreen').classList.contains('active')){stopAudio();showScr('startScreen');renderStartScreen();}else if($('gameScreen').classList.contains('active'))openPauseModal();}
     if(e.key==='Enter'&&$('nextBtn').style.display==='block')nextQ();
   });
 }
 
-// ── INIT ──
-function init(){initSkills();initGamify();renderPackSelector();bindEvents();checkSaved();renderStartScreenBadges();injectHeatmapContainers();renderHeatmap('startHeatmap');}
+// ══ INIT ══
+function init(){
+  initSkills();
+  const save=loadProgress();
+  if(save){skillState=save.skillState;currentStage=save.currentStage||1;}
+  bindEvents();renderStartScreen();
+}
 init();

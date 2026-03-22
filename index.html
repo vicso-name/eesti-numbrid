@@ -31,13 +31,14 @@
         </div>
         <div class="start-point">
           <div class="start-point-dot"></div>
-          <span>Предложения · SM-2 · XP · озвучка</span>
+          <span>Предложения · 4 этапа · озвучка</span>
         </div>
       </div>
 
-      <button class="btn btn-primary" id="startBtn">Начнём!</button>
+      <button class="btn btn-primary" id="startBtn">Начать Stage 1</button>
       <button class="btn btn-secondary" id="studyBtn" >Изучить числа</button>
-      <p class="start-info">28 чисел · 28 порядковых · 4 существительных · 75 навыков</p>
+      <button class="btn btn-ghost" id="faqBtn" style="width:100%;margin-top:4px;">Как это работает?</button>
+      <p class="start-info">28 чисел · 28 порядковых · 4 этапа · 75 навыков</p>
     </div>
 
     <div id="studyScreen" class="screen">
@@ -54,8 +55,7 @@
     <div id="gameScreen" class="screen">
       <div class="header">
         <div class="header-title">
-          <h2>Эстонские числа</h2>
-          <p id="sessionMeta">Сессия из 50 вопросов</p>
+          <p id="sessionMeta"></p>
         </div>
         <button class="btn btn-ghost" id="pauseBtn">Пауза</button>
       </div>
@@ -70,8 +70,8 @@
       <div class="progress-shell card">
         <div class="progress-meta">
           <div class="progress-left">
-            <strong id="progressTitle">Вопрос 1 из 50</strong>
-            <span id="progressText">1 / 50</span>
+            <strong id="progressTitle">Вопрос 1 из 20</strong>
+            <span id="progressText">1 / 20</span>
           </div>
           <div class="progress-right" id="progressPercent">0%</div>
         </div>
@@ -93,9 +93,9 @@
 
     <div id="resultScreen" class="screen result-screen">
       <div class="result-card card">
-        <div class="result-emoji" id="resultEmoji">🎉</div>
-        <h2 class="result-title" id="resultTitle">Отличный результат!</h2>
-        <p class="result-subtitle" id="resultSubtitle">Сессия завершена.</p>
+        <div class="result-emoji" id="resultEmoji"></div>
+        <h2 class="result-title" id="resultTitle">Сессия завершена</h2>
+        <p class="result-subtitle" id="resultSubtitle"></p>
         <div style="height:18px"></div>
         <div class="result-stats">
           <div class="result-stat"><div class="big" style="color:var(--success)" id="resultCorrect">0</div><div class="small">верно</div></div>
@@ -107,7 +107,7 @@
         <p id="resultPercent" class="result-percent"></p>
         <div style="height:16px"></div>
         <button class="btn btn-primary" id="retryBtn">Пройти ещё раз</button>
-        <div style="height:10px"></div>
+        <div style="height:25px"></div>
         <button class="btn btn-secondary" id="homeBtn">На главный экран</button>
       </div>
     </div>
@@ -129,6 +129,16 @@
     <div class="drill-card card">
       <button class="drill-close" id="drillClose">&times;</button>
       <div class="drill-phase" id="drillPhase"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="faqModal">
+    <div class="modal card" style="max-height:85vh;overflow-y:auto;">
+      <h3>Как это работает?</h3>
+      <div id="faqContent"></div>
+      <div class="modal-actions" style="margin-top:14px;">
+        <button class="btn btn-primary" id="faqCloseBtn">Понятно!</button>
+      </div>
     </div>
   </div>
 
