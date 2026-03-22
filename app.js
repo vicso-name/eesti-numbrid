@@ -65,13 +65,24 @@ function getNum(n){ return NUMBERS.find(x=>x.n===n); }
 function numsWithOrd(){ return NUMBERS.filter(x=>!!x.ord); }
 function numsSentence(){ return NUMBERS.filter(x=>x.n>=1&&x.n<=19); }
 
-// ══ AUDIO (iOS PWA safe) ══
-// Single reusable Audio element — iOS limits concurrent instances.
-// Unlock on first user gesture — iOS blocks play() outside tap chain.
-const audio = new Audio();
-audio.preload = 'auto';
-let audioGen = 0;
+// ══ AUDIO (iOS PWA compatible) ══
+let currentAudio = null, audioGen = 0;
+
+// iOS requires first play() inside a user gesture. We unlock with a silent play.
 let audioUnlocked = false;
+function unlockAudio(){
+  if(audioUnlocked) return;
+  try {
+    const a = new Audio();
+    a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
+    a.volume = 0;
+    const p = a.play();
+    if(p) p.then(()=>{ a.pause(); audioUnlocked = true; }).catch(()=>{});
+  } catch(e){}
+}
+['touchstart','touchend','click'].forEach(evt =>
+  document.addEventListener(evt, unlockAudio, { once: false, passive: true })
+);
 
 function getAudioFile(text){
   let name = text.toLowerCase().trim().replace(/[?.!,]/g,'').trim()
@@ -79,46 +90,33 @@ function getAudioFile(text){
   return 'audio/' + name + '.mp3';
 }
 
-// Unlock audio on first user gesture (iOS requirement)
-function unlockAudio(){
-  if(audioUnlocked) return;
-  audio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwBHAAAAAAD/+1DEAAAB8ANCUAAAIi4g6GoYYJQAAATQA8DAMA/8MAAADAMEwLBsFzOf/yBkGPE/5znP/OcBhxz/znOf/5znAYBg/8QBh/+c5//ygZBjxAGH/8oc///5znOc5z//nOcBgGH/wfB8H/+D4P/B8HwfB//g+D/wfB8AAAAAAA//tQxBAADOBpT1GMAAAAADSCAAAAT4Pg+D////g+D5///8HwfB8AAAAB8HwfB////4Pg+D///+D4Pg+AAAAAD4Pg+D////g+D5///8HwfB8AAAAAHwfB8H///+D4Pg///+D4Pg+AAAAAD4Pg+D////g+D5///8HwfB8AAAAAHwfB8H///+D4Pg///+D4Pg+AAAAAA==';
-  audio.volume = 0;
-  const p = audio.play();
-  if(p) p.then(() => { audio.pause(); audio.volume = 1; audioUnlocked = true; }).catch(() => {});
-}
-
-// Attach unlock to common user gestures
-['touchstart', 'touchend', 'click', 'keydown'].forEach(evt => {
-  document.addEventListener(evt, unlockAudio, { once: false, passive: true });
-});
-
 function playAudio(text){
   stopAudio();
   const gen = ++audioGen;
   return new Promise(resolve => {
+    const a = new Audio(getAudioFile(text));
+    currentAudio = a;
     const done = () => {
-      audio.onended = null;
-      audio.onerror = null;
-      if(gen === audioGen) resolve();
+      // Clean up to free iOS resources
+      a.onended = null; a.onerror = null;
+      try { a.src = ''; } catch(e){}
+      if(gen === audioGen) currentAudio = null;
+      resolve();
     };
-    audio.onended = done;
-    audio.onerror = done;
-    audio.src = getAudioFile(text);
-    audio.load(); // iOS needs explicit load() after src change
-    const p = audio.play();
-    if(p) p.catch(done);
+    a.onended = done;
+    a.onerror = done;
+    a.play().catch(done);
   });
 }
 
 function stopAudio(){
-  audioGen++;
-  audio.onended = null;
-  audio.onerror = null;
-  audio.pause();
-  audio.currentTime = 0;
+  if(currentAudio){
+    currentAudio.onended = null; currentAudio.onerror = null;
+    currentAudio.pause();
+    try { currentAudio.src = ''; } catch(e){}
+    currentAudio = null;
+  }
 }
-
 
 // ══ SENTENCE BUILDER ══
 function getRuNumeral(num,noun){ return num.n===2?(noun.gender==='f'?'две':'два'):num.ru; }
@@ -294,8 +292,8 @@ function renderDictation(ex){
   let isPlaying=false;
   playBtn.addEventListener('click',()=>{if(isPlaying)return;isPlaying=true;playBtn.disabled=true;playBtn.style.opacity='0.5';playAudio(ex.audioSentence).then(()=>{isPlaying=false;playBtn.disabled=false;playBtn.style.opacity='1';});});
   playRow.appendChild(playBtn);area.appendChild(playRow);
-  // Try auto-play immediately (no setTimeout — preserves iOS gesture chain better)
-  // Button is always visible as fallback for iOS PWA
+  // Auto-play immediately (no setTimeout — iOS needs gesture chain)
+  // Button always visible as fallback if auto-play is blocked
   playAudio(ex.audioSentence).catch(()=>{});
   const wrap=document.createElement('div');wrap.className='typing-area';
   const inp=document.createElement('input');inp.type='text';inp.className='typing-input';inp.placeholder='Напиши что услышал(а)...';inp.autocomplete='off';inp.spellcheck=false;
