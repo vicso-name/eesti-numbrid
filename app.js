@@ -65,58 +65,11 @@ function getNum(n){ return NUMBERS.find(x=>x.n===n); }
 function numsWithOrd(){ return NUMBERS.filter(x=>!!x.ord); }
 function numsSentence(){ return NUMBERS.filter(x=>x.n>=1&&x.n<=19); }
 
-// ══ AUDIO (iOS PWA compatible) ══
-let currentAudio = null, audioGen = 0;
-
-// iOS requires first play() inside a user gesture. We unlock with a silent play.
-let audioUnlocked = false;
-function unlockAudio(){
-  if(audioUnlocked) return;
-  try {
-    const a = new Audio();
-    a.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=';
-    a.volume = 0;
-    const p = a.play();
-    if(p) p.then(()=>{ a.pause(); audioUnlocked = true; }).catch(()=>{});
-  } catch(e){}
-}
-['touchstart','touchend','click'].forEach(evt =>
-  document.addEventListener(evt, unlockAudio, { once: false, passive: true })
-);
-
-function getAudioFile(text){
-  let name = text.toLowerCase().trim().replace(/[?.!,]/g,'').trim()
-    .replace(/[^a-zõäöü0-9\s]/g,'').replace(/\s+/g,'_').trim();
-  return 'audio/' + name + '.mp3';
-}
-
-function playAudio(text){
-  stopAudio();
-  const gen = ++audioGen;
-  return new Promise(resolve => {
-    const a = new Audio(getAudioFile(text));
-    currentAudio = a;
-    const done = () => {
-      // Clean up to free iOS resources
-      a.onended = null; a.onerror = null;
-      try { a.src = ''; } catch(e){}
-      if(gen === audioGen) currentAudio = null;
-      resolve();
-    };
-    a.onended = done;
-    a.onerror = done;
-    a.play().catch(done);
-  });
-}
-
-function stopAudio(){
-  if(currentAudio){
-    currentAudio.onended = null; currentAudio.onerror = null;
-    currentAudio.pause();
-    try { currentAudio.src = ''; } catch(e){}
-    currentAudio = null;
-  }
-}
+// ══ AUDIO ══
+let currentAudio=null, audioGen=0;
+function getAudioFile(text){ let name=text.toLowerCase().trim().replace(/[?.!,]/g,'').trim().replace(/[^a-zõäöü0-9\s]/g,'').replace(/\s+/g,'_').trim(); return 'audio/'+name+'.mp3'; }
+function playAudio(text){ stopAudio(); const gen=++audioGen; return new Promise(resolve=>{ const a=new Audio(getAudioFile(text)); currentAudio=a; const done=()=>{if(gen===audioGen)currentAudio=null;resolve();}; a.onended=done; a.onerror=done; a.play().catch(done); }); }
+function stopAudio(){ if(currentAudio){currentAudio.onended=null;currentAudio.onerror=null;currentAudio.pause();currentAudio=null;} }
 
 // ══ SENTENCE BUILDER ══
 function getRuNumeral(num,noun){ return num.n===2?(noun.gender==='f'?'две':'два'):num.ru; }
@@ -170,8 +123,8 @@ function pickSkill(){
 function parseSkillKey(key){ const m=key.match(/^n(\d+)_(\w+)$/); if(!m)return null; return{num:getNum(parseInt(m[1])),form:m[2]}; }
 
 function makeChoiceNumToWord(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et); return{type:'choice',label:'Как будет по-эстонски?',qText:`${num.n}`,qRu:num.ru,answer:num.et,options:shuffle([num.et,...wr]),reveal:num.et,_skillKey:key}; }
-function makeChoiceWordToNum(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n)); return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',answer:String(num.n),options:shuffle([String(num.n),...wr]),reveal:`${num.et} = ${num.n}`,_skillKey:key}; }
-function makeChoiceOrdinal(num,key){ const pool=getStageNumbers().filter(x=>!!x.ord); const fb=pool.length>1?pool:numsWithOrd(); const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord); return{type:'choice',label:'Порядковое числительное',qText:`${num.n}-й (${num.ordRu})`,qRu:'',answer:num.ord,options:shuffle([num.ord,...wr]),reveal:`${num.ordRu} = ${num.ord}`,_skillKey:key}; }
+function makeChoiceWordToNum(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n)); return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',answer:String(num.n),options:shuffle([String(num.n),...wr]),reveal:`${num.et} = ${num.n}`,_audio:num.et,_skillKey:key}; }
+function makeChoiceOrdinal(num,key){ const pool=getStageNumbers().filter(x=>!!x.ord); const fb=pool.length>1?pool:numsWithOrd(); const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.ord); return{type:'choice',label:'Порядковое числительное',qText:`${num.n}-й (${num.ordRu})`,qRu:'',answer:num.ord,options:shuffle([num.ord,...wr]),reveal:`${num.ordRu} = ${num.ord}`,_audio:num.ord,_skillKey:key}; }
 function makeChoiceSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); const pool=getStageNumbers().filter(x=>x.n<=19); const fb=pool.length>1?pool:numsSentence(); const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>x.et); const nf=num.n===1?noun.nom:noun.part; return{type:'choice',label:'Вставь число',qText:`Mul on ___ ${nf}`,qRu:s.ru,answer:num.et,options:shuffle([num.et,...wr]),reveal:s.et,_skillKey:key}; }
 
 function makeBuildSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); const dist=[]; const oth=getStageNumbers().filter(x=>x.n!==num.n); const extra=pick(oth.length?oth:NUMBERS.filter(x=>x.n!==num.n)); if(extra)dist.push(extra.et); const wn=pick(NOUNS.filter(x=>x.nom!==noun.nom)); if(wn)dist.push(num.n===1?wn.nom:wn.part); return{type:'build',label:'Собери предложение',qRu:s.ru,answer:s.words,bank:shuffle([...s.words,...dist.slice(0,2)]),reveal:s.et,_skillKey:key}; }
@@ -288,18 +241,16 @@ function checkTyping(inp,ex,btn){if(ans)return;const val=normalize(inp.value);if
 function renderDictation(ex){
   $('qRu').style.display='none';const area=$('exerciseArea');
   const playRow=document.createElement('div');playRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
-  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;';playBtn.textContent='🔊 Послушать';
+  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;display:none;';playBtn.textContent='🔊 Послушать ещё раз';
   let isPlaying=false;
   playBtn.addEventListener('click',()=>{if(isPlaying)return;isPlaying=true;playBtn.disabled=true;playBtn.style.opacity='0.5';playAudio(ex.audioSentence).then(()=>{isPlaying=false;playBtn.disabled=false;playBtn.style.opacity='1';});});
   playRow.appendChild(playBtn);area.appendChild(playRow);
-  // Auto-play immediately (no setTimeout — iOS needs gesture chain)
-  // Button always visible as fallback if auto-play is blocked
-  playAudio(ex.audioSentence).catch(()=>{});
+  setTimeout(()=>{playAudio(ex.audioSentence).then(()=>{playBtn.style.display='';});},300);
   const wrap=document.createElement('div');wrap.className='typing-area';
   const inp=document.createElement('input');inp.type='text';inp.className='typing-input';inp.placeholder='Напиши что услышал(а)...';inp.autocomplete='off';inp.spellcheck=false;
   const btn=document.createElement('button');btn.className='typing-submit';btn.textContent='Проверить';
   btn.addEventListener('click',()=>checkTyping(inp,ex,btn));inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
-  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);setTimeout(()=>inp.focus(),80);
+  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);setTimeout(()=>inp.focus(),400);
 }
 
 function showReplayBtn(sentence){hideReplayBtn();const row=document.createElement('div');row.id='audioReplayRow';row.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;';const btn=document.createElement('button');btn.className='btn btn-secondary';btn.style.cssText='width:auto;padding:8px 16px;font-size:0.85rem;';btn.textContent='🔊 Послушать';btn.addEventListener('click',()=>playAudio(sentence));row.appendChild(btn);$('nextBtn').parentNode.insertBefore(row,$('nextBtn'));}
@@ -316,9 +267,9 @@ function proc(ok){
   }
   if(ok){correct++;streak++;if(streak>best)best=streak;}else{wrong++;streak=0;}
   updStats();saveProgress();
-  const sentence=curEx.reveal||curEx.audioSentence||'';
+  const sentence=curEx._audio||curEx.audioSentence||curEx.reveal||'';
   const nextBtn=$('nextBtn');nextBtn.textContent=qNum>=SESSION_LEN?'Результаты':'Далее';
-  if(sentence){showReplayBtn(sentence);let shown=false;const show=()=>{if(shown)return;shown=true;nextBtn.style.display='block';};playAudio(sentence).then(show).catch(show);setTimeout(show,4000);}
+  if(sentence){showReplayBtn(sentence);let shown=false;const show=()=>{if(shown)return;shown=true;nextBtn.style.display='block';};setTimeout(()=>{playAudio(sentence).then(show);},300);setTimeout(show,4000);}
   else{nextBtn.style.display='block';}
 }
 
