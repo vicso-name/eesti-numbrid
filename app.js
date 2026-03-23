@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════
-// Eesti Numbrid — Estonian Numbers Trainer
+// Eesti Numbrid — Estonian Numbers & Phrases
 // Architecture: Leitner 3-box + linear stages
 // ═══════════════════════════════════════════
 
-// ══ DATA ══
+// ══ DATA: NUMBERS ══
 const NUMBERS = [
   {n:1, et:'üks', ru:'один', ord:'esimene', ordRu:'первый'},
   {n:2, et:'kaks', ru:'два', ord:'teine', ordRu:'второй'},
@@ -35,6 +35,7 @@ const NUMBERS = [
   {n:100, et:'sada', ru:'сто', ord:'sajas', ordRu:'сотый'},
 ];
 
+// ══ DATA: NOUNS (stages 1-4) ══
 const NOUNS = [
   {nom:'õun', part:'õuna', gender:'n', ruOne:'одно яблоко', ruGen:'яблока', ruGenPl:'яблок'},
   {nom:'raamat', part:'raamatut', gender:'f', ruOne:'одна книга', ruGen:'книги', ruGenPl:'книг'},
@@ -42,15 +43,86 @@ const NOUNS = [
   {nom:'kass', part:'kassi', gender:'f', ruOne:'одна кошка', ruGen:'кошки', ruGenPl:'кошек'},
 ];
 
-// ══ STAGES ══
-const STAGES = [
-  { id:1, label:'Числа 1–5',     nums:[1,2,3,4,5] },
-  { id:2, label:'Числа 6–10',    nums:[6,7,8,9,10] },
-  { id:3, label:'Числа 11–20',   nums:[11,12,13,14,15,16,17,18,19,20] },
-  { id:4, label:'Десятки 30–100', nums:[30,40,50,60,70,80,90,100] },
+// ══ DATA: PATTERNS FOR STAGES 5-8 ══
+// Each pattern: {et, ru, words} — full sentence, translation, word chips for build
+
+const PRONOUN_PATTERNS = [
+  {et:'Sul on üks õun', ru:'У тебя одно яблоко', words:['Sul','on','üks','õun']},
+  {et:'Sul on kolm koera', ru:'У тебя три собаки', words:['Sul','on','kolm','koera']},
+  {et:'Sul on viis kassi', ru:'У тебя пять кошек', words:['Sul','on','viis','kassi']},
+  {et:'Tal on kaks raamatut', ru:'У него две книги', words:['Tal','on','kaks','raamatut']},
+  {et:'Tal on neli õuna', ru:'У него четыре яблока', words:['Tal','on','neli','õuna']},
+  {et:'Tal on üks koer', ru:'У неё одна собака', words:['Tal','on','üks','koer']},
+  {et:'Meil on kolm kassi', ru:'У нас три кошки', words:['Meil','on','kolm','kassi']},
+  {et:'Meil on viis raamatut', ru:'У нас пять книг', words:['Meil','on','viis','raamatut']},
+  {et:'Teil on kaks koera', ru:'У вас две собаки', words:['Teil','on','kaks','koera']},
+  {et:'Neil on neli õuna', ru:'У них четыре яблока', words:['Neil','on','neli','õuna']},
+  {et:'Neil on üks kass', ru:'У них одна кошка', words:['Neil','on','üks','kass']},
+  {et:'Sul on kaks õuna', ru:'У тебя два яблока', words:['Sul','on','kaks','õuna']},
 ];
 
-const SAVE_KEY = 'numbrid_v2';
+const AGE_PATTERNS = [
+  {et:'Ma olen viis aastat vana', ru:'Мне 5 лет', words:['Ma','olen','viis','aastat','vana']},
+  {et:'Ma olen seitse aastat vana', ru:'Мне 7 лет', words:['Ma','olen','seitse','aastat','vana']},
+  {et:'Ma olen kümme aastat vana', ru:'Мне 10 лет', words:['Ma','olen','kümme','aastat','vana']},
+  {et:'Sa oled viis aastat vana', ru:'Тебе 5 лет', words:['Sa','oled','viis','aastat','vana']},
+  {et:'Sa oled kaheksa aastat vana', ru:'Тебе 8 лет', words:['Sa','oled','kaheksa','aastat','vana']},
+  {et:'Ta on kolm aastat vana', ru:'Ему 3 года', words:['Ta','on','kolm','aastat','vana']},
+  {et:'Ta on kuus aastat vana', ru:'Ей 6 лет', words:['Ta','on','kuus','aastat','vana']},
+  {et:'Ta on üheksa aastat vana', ru:'Ему 9 лет', words:['Ta','on','üheksa','aastat','vana']},
+  {et:'Ta on viisteist aastat vana', ru:'Ей 15 лет', words:['Ta','on','viisteist','aastat','vana']},
+  {et:'Ta on kaheksateist aastat vana', ru:'Ему 18 лет', words:['Ta','on','kaheksateist','aastat','vana']},
+  {et:'Kui vana sa oled', ru:'Сколько тебе лет?', words:['Kui','vana','sa','oled']},
+  {et:'Kui vana ta on', ru:'Сколько ему/ей лет?', words:['Kui','vana','ta','on']},
+];
+
+const QA_PATTERNS = [
+  {et:'Kas sul on koer', ru:'У тебя есть собака?', words:['Kas','sul','on','koer']},
+  {et:'Jah, mul on koer', ru:'Да, у меня есть собака', words:['Jah','mul','on','koer']},
+  {et:'Kas sul on kass', ru:'У тебя есть кошка?', words:['Kas','sul','on','kass']},
+  {et:'Ei, mul ei ole kassi', ru:'Нет, у меня нет кошки', words:['Ei','mul','ei','ole','kassi']},
+  {et:'Kas tal on auto', ru:'У него есть машина?', words:['Kas','tal','on','auto']},
+  {et:'Jah, tal on auto', ru:'Да, у него есть машина', words:['Jah','tal','on','auto']},
+  {et:'Mul ei ole autot', ru:'У меня нет машины', words:['Mul','ei','ole','autot']},
+  {et:'Mul ei ole koera', ru:'У меня нет собаки', words:['Mul','ei','ole','koera']},
+  {et:'Tal ei ole kassi', ru:'У него нет кошки', words:['Tal','ei','ole','kassi']},
+  {et:'Kas teil on raamat', ru:'У вас есть книга?', words:['Kas','teil','on','raamat']},
+];
+
+const FAMILY_PATTERNS = [
+  {et:'Mul on üks poeg', ru:'У меня один сын', words:['Mul','on','üks','poeg']},
+  {et:'Mul on kaks poega', ru:'У меня два сына', words:['Mul','on','kaks','poega']},
+  {et:'Mul on üks tütar', ru:'У меня одна дочь', words:['Mul','on','üks','tütar']},
+  {et:'Mul on kolm tütart', ru:'У меня три дочери', words:['Mul','on','kolm','tütart']},
+  {et:'Mul on kaks last', ru:'У меня двое детей', words:['Mul','on','kaks','last']},
+  {et:'Tal on poeg ja tütar', ru:'У него сын и дочь', words:['Tal','on','poeg','ja','tütar']},
+  {et:'Kas sul on lapsi', ru:'У тебя есть дети?', words:['Kas','sul','on','lapsi']},
+  {et:'Mul ei ole lapsi', ru:'У меня нет детей', words:['Mul','ei','ole','lapsi']},
+  {et:'Tal on kolm last', ru:'У него трое детей', words:['Tal','on','kolm','last']},
+  {et:'Mul on poeg ja kaks tütart', ru:'У меня сын и две дочери', words:['Mul','on','poeg','ja','kaks','tütart']},
+];
+
+// Map stage type → patterns
+const PATTERN_MAP = {
+  pron: PRONOUN_PATTERNS,
+  age: AGE_PATTERNS,
+  qa: QA_PATTERNS,
+  family: FAMILY_PATTERNS,
+};
+
+// ══ STAGES ══
+const STAGES = [
+  { id:1, label:'Числа 1–5',     type:'number', nums:[1,2,3,4,5] },
+  { id:2, label:'Числа 6–10',    type:'number', nums:[6,7,8,9,10] },
+  { id:3, label:'Числа 11–20',   type:'number', nums:[11,12,13,14,15,16,17,18,19,20] },
+  { id:4, label:'Десятки 30–100', type:'number', nums:[30,40,50,60,70,80,90,100] },
+  { id:5, label:'Местоимения',    type:'pron' },
+  { id:6, label:'Возраст',        type:'age' },
+  { id:7, label:'Вопросы',        type:'qa' },
+  { id:8, label:'Семья',          type:'family' },
+];
+
+const SAVE_KEY = 'numbrid_v3';
 const SESSION_LEN = 20;
 const STREAK_NEEDED = 2;
 
@@ -71,26 +143,55 @@ function getAudioFile(text){ let name=text.toLowerCase().trim().replace(/[?.!,]/
 function playAudio(text){ stopAudio(); const gen=++audioGen; return new Promise(resolve=>{ const a=new Audio(getAudioFile(text)); currentAudio=a; const done=()=>{if(gen===audioGen)currentAudio=null;resolve();}; a.onended=done; a.onerror=done; a.play().catch(done); }); }
 function stopAudio(){ if(currentAudio){currentAudio.onended=null;currentAudio.onerror=null;currentAudio.pause();currentAudio=null;} }
 
-// ══ SENTENCE BUILDER ══
+// ══ SENTENCE BUILDER (stages 1-4) ══
 function getRuNumeral(num,noun){ return num.n===2?(noun.gender==='f'?'две':'два'):num.ru; }
 function makeSentence(num,noun){ const nf=num.n===1?noun.nom:noun.part; const et=`Mul on ${num.et} ${nf}`; let ru; if(num.n===1)ru=`У меня ${noun.ruOne}`; else if(num.n<=4)ru=`У меня ${getRuNumeral(num,noun)} ${noun.ruGen}`; else ru=`У меня ${num.ru} ${noun.ruGenPl}`; return{et,ru,words:['Mul','on',num.et,nf]}; }
 
 // ═══════════════════════════════════════════
 // ══ LEITNER STATE ══
-// Box 0=New → Box 1=Learning → Box 2=Mastered
-// 2 correct in a row → advance. 1 wrong → back to 0.
 // ═══════════════════════════════════════════
 let skillState={}, currentStage=1;
 let correct=0,wrong=0,streak=0,best=0,qNum=0,ans=false,curEx=null;
 
 function makeSkill(){ return {box:0,streak:0,totalCorrect:0,totalWrong:0}; }
-function initSkills(){ skillState={}; NUMBERS.forEach(num=>{ skillState[`n${num.n}_card`]=makeSkill(); if(num.ord)skillState[`n${num.n}_ord`]=makeSkill(); if(num.n>=1&&num.n<=19)skillState[`n${num.n}_sent`]=makeSkill(); }); }
+
+function initSkills(){
+  skillState={};
+  // Stages 1-4: number skills
+  NUMBERS.forEach(num=>{
+    skillState[`n${num.n}_card`]=makeSkill();
+    if(num.ord) skillState[`n${num.n}_ord`]=makeSkill();
+    if(num.n>=1&&num.n<=19) skillState[`n${num.n}_sent`]=makeSkill();
+  });
+  // Stages 5-8: pattern skills
+  Object.entries(PATTERN_MAP).forEach(([type, patterns])=>{
+    patterns.forEach((_,i)=>{ skillState[`${type}_${i}`]=makeSkill(); });
+  });
+}
 
 // ══ STAGE HELPERS ══
 function getStage(id){ return STAGES.find(s=>s.id===id)||STAGES[0]; }
-function getStageSkillKeys(sid){ const st=getStage(sid||currentStage); const keys=[]; st.nums.forEach(n=>{keys.push(`n${n}_card`); const num=getNum(n); if(num&&num.ord)keys.push(`n${n}_ord`); if(n>=1&&n<=19)keys.push(`n${n}_sent`);}); return keys; }
+
+function getStageSkillKeys(sid){
+  const st=getStage(sid||currentStage);
+  const keys=[];
+  if(st.type==='number'){
+    st.nums.forEach(n=>{
+      keys.push(`n${n}_card`);
+      const num=getNum(n);
+      if(num&&num.ord) keys.push(`n${n}_ord`);
+      if(n>=1&&n<=19) keys.push(`n${n}_sent`);
+    });
+  } else {
+    // Pattern-based stage
+    const patterns=PATTERN_MAP[st.type];
+    if(patterns) patterns.forEach((_,i)=> keys.push(`${st.type}_${i}`));
+  }
+  return keys;
+}
+
 function getStageSkills(sid){ return getStageSkillKeys(sid||currentStage).map(k=>[k,skillState[k]]).filter(([_,s])=>s); }
-function getStageNumbers(sid){ return getStage(sid||currentStage).nums.map(n=>getNum(n)).filter(Boolean); }
+function getStageNumbers(sid){ const st=getStage(sid||currentStage); return (st.nums||[]).map(n=>getNum(n)).filter(Boolean); }
 function getStageMastered(sid){ return getStageSkills(sid).filter(([_,s])=>s.box>=2).length; }
 function getStageTotal(sid){ return getStageSkillKeys(sid||currentStage).length; }
 function isStageComplete(sid){ return getStageMastered(sid)===getStageTotal(sid); }
@@ -101,10 +202,7 @@ function saveProgress(){ try{localStorage.setItem(SAVE_KEY,JSON.stringify({skill
 function loadProgress(){ try{ const raw=localStorage.getItem(SAVE_KEY); if(!raw)return null; const d=JSON.parse(raw); if(!d.skillState)return null; Object.values(d.skillState).forEach(sk=>{if(sk.box===undefined)sk.box=sk.level||0;if(sk.streak===undefined)sk.streak=0;if(sk.totalCorrect===undefined)sk.totalCorrect=0;if(sk.totalWrong===undefined)sk.totalWrong=0;}); return d; }catch(e){return null;} }
 function hasSave(){ return !!loadProgress(); }
 
-// ═══════════════════════════════════════════
 // ══ SKILL PICKER ══
-// Priority: Box 0 > Box 1 > Box 2
-// ═══════════════════════════════════════════
 function pickSkill(){
   const entries=getStageSkills();
   const box0=entries.filter(([_,s])=>s.box===0);
@@ -118,9 +216,22 @@ function pickSkill(){
 }
 
 // ═══════════════════════════════════════════
-// ══ EXERCISE GENERATORS ══
+// ══ EXERCISE GENERATORS — NUMBERS (stages 1-4) ══
 // ═══════════════════════════════════════════
-function parseSkillKey(key){ const m=key.match(/^n(\d+)_(\w+)$/); if(!m)return null; return{num:getNum(parseInt(m[1])),form:m[2]}; }
+function parseSkillKey(key){
+  // Number skills: n5_card, n5_ord, n5_sent
+  const numMatch=key.match(/^n(\d+)_(\w+)$/);
+  if(numMatch) return{type:'number', num:getNum(parseInt(numMatch[1])), form:numMatch[2]};
+  // Pattern skills: pron_3, age_0, qa_5, family_2
+  const patMatch=key.match(/^(\w+)_(\d+)$/);
+  if(patMatch){
+    const ptype=patMatch[1];
+    const idx=parseInt(patMatch[2]);
+    const patterns=PATTERN_MAP[ptype];
+    if(patterns&&patterns[idx]) return{type:'pattern', ptype, pattern:patterns[idx], idx, allPatterns:patterns};
+  }
+  return null;
+}
 
 function makeChoiceNumToWord(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.et!==num.et)).slice(0,3).map(x=>x.et); return{type:'choice',label:'Как будет по-эстонски?',qText:`${num.n}`,qRu:num.ru,answer:num.et,options:shuffle([num.et,...wr]),reveal:num.et,_skillKey:key}; }
 function makeChoiceWordToNum(num,key){ const pool=getStageNumbers(); const fb=pool.length>1?pool:NUMBERS; const wr=shuffle(fb.filter(x=>x.n!==num.n)).slice(0,3).map(x=>String(x.n)); return{type:'choice',label:'Какое это число?',qText:num.et,qRu:'',answer:String(num.n),options:shuffle([String(num.n),...wr]),reveal:`${num.et} = ${num.n}`,_audio:num.et,_skillKey:key}; }
@@ -139,38 +250,94 @@ function makeDictationNumber(num,key){ return{type:'dictation',label:'Аудио
 function makeDictationSentence(num,key){ const noun=pick(NOUNS); const s=makeSentence(num,noun); return{type:'dictation',label:'Аудио-диктант',qText:'Послушай и напиши:',audioSentence:s.et,answer:normalize(s.et),reveal:s.et,_skillKey:key}; }
 function makeDictationOrdinal(num,key){ return{type:'dictation',label:'Аудио-диктант (порядковое)',qText:'Послушай и напиши порядковое:',audioSentence:num.ord,answer:normalize(num.ord),reveal:num.ord,_skillKey:key}; }
 
-// ══ EXERCISE ROUTING (box-based) ══
+// ═══════════════════════════════════════════
+// ══ EXERCISE GENERATORS — PATTERNS (stages 5-8) ══
+// ═══════════════════════════════════════════
+function makePatternChoice(pattern, key, allPatterns){
+  const wrongs=shuffle(allPatterns.filter(p=>p.et!==pattern.et)).slice(0,3).map(p=>p.et);
+  return{type:'choice',label:'Выбери перевод',qText:pattern.ru,qRu:'',
+    answer:pattern.et,options:shuffle([pattern.et,...wrongs]),reveal:pattern.et,_audio:pattern.et,_skillKey:key};
+}
+
+function makePatternChoiceReverse(pattern, key, allPatterns){
+  const wrongs=shuffle(allPatterns.filter(p=>p.ru!==pattern.ru)).slice(0,3).map(p=>p.ru);
+  return{type:'choice',label:'Что означает?',qText:pattern.et,qRu:'',
+    answer:pattern.ru,options:shuffle([pattern.ru,...wrongs]),reveal:pattern.et,_audio:pattern.et,_skillKey:key};
+}
+
+function makePatternBuild(pattern, key, allPatterns){
+  const distractors=[];
+  const other=pick(allPatterns.filter(p=>p.et!==pattern.et));
+  if(other){
+    const diff=other.words.filter(w=>!pattern.words.includes(w));
+    if(diff.length) distractors.push(pick(diff));
+  }
+  // Add one more distractor from a different word
+  const other2=pick(allPatterns.filter(p=>p.et!==pattern.et&&p!==other));
+  if(other2){
+    const diff2=other2.words.filter(w=>!pattern.words.includes(w)&&!distractors.includes(w));
+    if(diff2.length) distractors.push(pick(diff2));
+  }
+  return{type:'build',label:'Собери предложение',qRu:pattern.ru,
+    answer:pattern.words,bank:shuffle([...pattern.words,...distractors]),
+    reveal:pattern.et,_audio:pattern.et,_skillKey:key};
+}
+
+function makePatternTyping(pattern, key){
+  return{type:'typing',label:'Переведи на эстонский',qText:'Переведи:',qRu:pattern.ru,
+    answer:normalize(pattern.et),reveal:pattern.et,_audio:pattern.et,_skillKey:key};
+}
+
+// ═══════════════════════════════════════════
+// ══ EXERCISE ROUTING ══
+// ═══════════════════════════════════════════
 function makeExForSkill(skillKey){
   const parsed=parseSkillKey(skillKey);
-  if(!parsed)return makeChoiceNumToWord(pick(getStageNumbers()),skillKey);
-  const{num,form}=parsed;
+  if(!parsed) return makeChoiceNumToWord(pick(NUMBERS),skillKey);
   const sk=skillState[skillKey];
   const box=sk?sk.box:0;
   const roll=Math.random();
+
+  // Difficulty by box
   let choiceP,buildP,typingP;
   if(box===0)     {choiceP=0.50;buildP=0.65;typingP=0.85;}
   else if(box===1){choiceP=0.20;buildP=0.35;typingP=0.70;}
   else            {choiceP=0.00;buildP=0.10;typingP=0.55;}
 
-  if(form==='card'){
-    if(roll<choiceP)return Math.random()>0.5?makeChoiceNumToWord(num,skillKey):makeChoiceWordToNum(num,skillKey);
-    if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
-    if(roll<typingP)return pick([makeTypingNumToWord,makeTypingRuToEt])(num,skillKey);
-    return makeDictationNumber(num,skillKey);
+  // ── Number-based stages (1-4) ──
+  if(parsed.type==='number'){
+    const{num,form}=parsed;
+    if(form==='card'){
+      if(roll<choiceP)return Math.random()>0.5?makeChoiceNumToWord(num,skillKey):makeChoiceWordToNum(num,skillKey);
+      if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
+      if(roll<typingP)return pick([makeTypingNumToWord,makeTypingRuToEt])(num,skillKey);
+      return makeDictationNumber(num,skillKey);
+    }
+    if(form==='ord'){
+      if(roll<choiceP)return makeChoiceOrdinal(num,skillKey);
+      if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
+      if(roll<typingP)return pick([makeTypingOrdinal,makeTypingOrdRuToEt])(num,skillKey);
+      return makeDictationOrdinal(num,skillKey);
+    }
+    if(form==='sent'){
+      if(roll<choiceP)return makeChoiceSentence(num,skillKey);
+      if(roll<buildP)return makeBuildSentence(num,skillKey);
+      if(roll<typingP)return makeTypingSentence(num,skillKey);
+      return makeDictationSentence(num,skillKey);
+    }
+    return makeChoiceNumToWord(num,skillKey);
   }
-  if(form==='ord'){
-    if(roll<choiceP)return makeChoiceOrdinal(num,skillKey);
-    if(roll<buildP&&num.n<=19)return makeBuildSentence(num,skillKey);
-    if(roll<typingP)return pick([makeTypingOrdinal,makeTypingOrdRuToEt])(num,skillKey);
-    return makeDictationOrdinal(num,skillKey);
+
+  // ── Pattern-based stages (5-8) ──
+  if(parsed.type==='pattern'){
+    const{pattern,allPatterns}=parsed;
+    if(roll<choiceP) return Math.random()>0.5?makePatternChoice(pattern,skillKey,allPatterns):makePatternChoiceReverse(pattern,skillKey,allPatterns);
+    if(roll<buildP) return makePatternBuild(pattern,skillKey,allPatterns);
+    return makePatternTyping(pattern,skillKey);
+    // No dictation for patterns (no guaranteed audio files yet)
   }
-  if(form==='sent'){
-    if(roll<choiceP)return makeChoiceSentence(num,skillKey);
-    if(roll<buildP)return makeBuildSentence(num,skillKey);
-    if(roll<typingP)return makeTypingSentence(num,skillKey);
-    return makeDictationSentence(num,skillKey);
-  }
-  return makeChoiceNumToWord(num,skillKey);
+
+  return makeChoiceNumToWord(pick(NUMBERS),skillKey);
 }
 
 // ═══════════════════════════════════════════
@@ -241,24 +408,22 @@ function checkTyping(inp,ex,btn){if(ans)return;const val=normalize(inp.value);if
 function renderDictation(ex){
   $('qRu').style.display='none';const area=$('exerciseArea');
   const playRow=document.createElement('div');playRow.style.cssText='display:flex;align-items:center;gap:12px;margin-bottom:16px;';
-  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;display:none;';playBtn.textContent='🔊 Послушать ещё раз';
+  const playBtn=document.createElement('button');playBtn.className='btn btn-secondary';playBtn.style.cssText='width:auto;padding:12px 20px;font-size:1.2rem;';playBtn.textContent='🔊 Послушать';
   let isPlaying=false;
   playBtn.addEventListener('click',()=>{if(isPlaying)return;isPlaying=true;playBtn.disabled=true;playBtn.style.opacity='0.5';playAudio(ex.audioSentence).then(()=>{isPlaying=false;playBtn.disabled=false;playBtn.style.opacity='1';});});
   playRow.appendChild(playBtn);area.appendChild(playRow);
-  setTimeout(()=>{playAudio(ex.audioSentence).then(()=>{playBtn.style.display='';});},300);
+  playAudio(ex.audioSentence).catch(()=>{});
   const wrap=document.createElement('div');wrap.className='typing-area';
   const inp=document.createElement('input');inp.type='text';inp.className='typing-input';inp.placeholder='Напиши что услышал(а)...';inp.autocomplete='off';inp.spellcheck=false;
   const btn=document.createElement('button');btn.className='typing-submit';btn.textContent='Проверить';
   btn.addEventListener('click',()=>checkTyping(inp,ex,btn));inp.addEventListener('keydown',e=>{if(e.key==='Enter')checkTyping(inp,ex,btn);});
-  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);setTimeout(()=>inp.focus(),400);
+  wrap.appendChild(inp);wrap.appendChild(btn);area.appendChild(wrap);setTimeout(()=>inp.focus(),80);
 }
 
 function showReplayBtn(sentence){hideReplayBtn();const row=document.createElement('div');row.id='audioReplayRow';row.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;';const btn=document.createElement('button');btn.className='btn btn-secondary';btn.style.cssText='width:auto;padding:8px 16px;font-size:0.85rem;';btn.textContent='🔊 Послушать';btn.addEventListener('click',()=>playAudio(sentence));row.appendChild(btn);$('nextBtn').parentNode.insertBefore(row,$('nextBtn'));}
 function hideReplayBtn(){const el=$('audioReplayRow');if(el)el.remove();}
 
-// ═══════════════════════════════════════════
 // ══ PROC (Leitner) ══
-// ═══════════════════════════════════════════
 function proc(ok){
   if(curEx._skillKey&&skillState[curEx._skillKey]){
     const sk=skillState[curEx._skillKey];
@@ -269,7 +434,7 @@ function proc(ok){
   updStats();saveProgress();
   const sentence=curEx._audio||curEx.audioSentence||curEx.reveal||'';
   const nextBtn=$('nextBtn');nextBtn.textContent=qNum>=SESSION_LEN?'Результаты':'Далее';
-  if(sentence){showReplayBtn(sentence);let shown=false;const show=()=>{if(shown)return;shown=true;nextBtn.style.display='block';};setTimeout(()=>{playAudio(sentence).then(show);},300);setTimeout(show,4000);}
+  if(sentence){showReplayBtn(sentence);let shown=false;const show=()=>{if(shown)return;shown=true;nextBtn.style.display='block';};playAudio(sentence).then(show).catch(show);setTimeout(show,4000);}
   else{nextBtn.style.display='block';}
 }
 
@@ -285,16 +450,13 @@ function updStats(){
   $('sessionMeta').textContent=`Stage ${currentStage}: ${st.label} · ${m}/${t} освоено`;
 }
 
-// ═══════════════════════════════════════════
 // ══ RESULTS ══
-// ═══════════════════════════════════════════
 function showResults(){
   showScr('resultScreen');
   const answered=correct+wrong;const pct=answered?Math.round((correct/answered)*100):0;
   $('resultCorrect').textContent=correct;$('resultWrong').textContent=wrong;$('resultBest').textContent=best;
   $('resultPercent').textContent=`${pct}% точность · ${answered} ответов`;
   setTimeout(()=>{$('resultBarFill').style.width=`${pct}%`;},140);
-
   const st=getStage(currentStage);const m=getStageMastered();const t=getStageTotal();const complete=m===t;
   $('resultEmoji').textContent='';
   $('resultTitle').textContent=`Stage ${currentStage}: ${st.label}`;
@@ -310,7 +472,6 @@ function renderResultProgress(mastered,total,complete){
   const box1=skills.filter(([_,s])=>s.box===1).length;
   const box2=skills.filter(([_,s])=>s.box===2).length;
   const pct=total>0?Math.round((mastered/total)*100):0;
-
   c.innerHTML=`<div style="padding:14px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
       <span style="font-size:.82rem;font-weight:800;">Прогресс Stage ${currentStage}</span>
@@ -340,13 +501,17 @@ function renderResultProgress(mastered,total,complete){
   if(nsBtn)nsBtn.addEventListener('click',()=>{currentStage++;saveProgress();startGame();});
 }
 
-// ═══════════════════════════════════════════
 // ══ START SCREEN ══
-// ═══════════════════════════════════════════
 function renderStartScreen(){
   const save=loadProgress();
-  if(save){skillState=save.skillState;currentStage=save.currentStage||1;if(isStageComplete(currentStage)&&currentStage<STAGES.length)currentStage=getMaxUnlockedStage();}
-  else{initSkills();currentStage=1;}
+  if(save){
+    skillState=save.skillState;currentStage=save.currentStage||1;
+    // Ensure new skills exist (if upgrading from older save)
+    Object.entries(PATTERN_MAP).forEach(([type,patterns])=>{
+      patterns.forEach((_,i)=>{ const k=`${type}_${i}`; if(!skillState[k]) skillState[k]=makeSkill(); });
+    });
+    if(isStageComplete(currentStage)&&currentStage<STAGES.length) currentStage=getMaxUnlockedStage();
+  } else { initSkills();currentStage=1; }
   const st=getStage(currentStage);const m=getStageMastered();const t=getStageTotal();
   $('startBtn').textContent=m>0?`Продолжить · ${m}/${t} освоено`:`Начать Stage ${currentStage}`;
   renderStageIndicator();
@@ -365,9 +530,9 @@ function renderStageIndicator(){
     else if(active){bg='rgba(14,165,233,.12)';border='rgba(14,165,233,.3)';color='var(--accent-2)';}
     else if(locked){bg='rgba(255,255,255,.02)';border='rgba(255,255,255,.06)';color='var(--text-dim)';}
     else{bg='rgba(255,255,255,.04)';border='rgba(255,255,255,.08)';color='var(--text)';}
-    html+=`<div style="padding:8px 12px;border-radius:10px;background:${bg};border:1px solid ${border};text-align:center;min-width:65px;${locked?'opacity:.4;':''}">
-      <div style="font-size:.72rem;font-weight:800;color:${color};">${locked?'🔒':complete?'✓':stage.id}</div>
-      <div style="font-size:.6rem;color:var(--text-dim);font-family:'DM Mono',monospace;margin-top:2px;">${locked?'—':`${m}/${t}`}</div>
+    html+=`<div style="padding:8px 12px;border-radius:10px;background:${bg};border:1px solid ${border};text-align:center;min-width:55px;${locked?'opacity:.4;':''}">
+      <div style="font-size:.68rem;font-weight:800;color:${color};">${locked?'🔒':complete?'✓':stage.id}</div>
+      <div style="font-size:.55rem;color:var(--text-dim);font-family:'DM Mono',monospace;margin-top:2px;">${locked?'—':`${m}/${t}`}</div>
     </div>`;
   });
   html+='</div>';host.innerHTML=html;
@@ -379,9 +544,44 @@ function closePauseModal(){$('pauseModal').classList.remove('show');}
 function goHomeFromPause(){closePauseModal();saveProgress();showScr('startScreen');renderStartScreen();}
 function restartFromPause(){closePauseModal();startGame();}
 
-// ═══════════════════════════════════════════
+// ══ FAQ ══
+function openFaq(){
+  $('faqContent').innerHTML=`
+    <div style="font-size:.88rem;line-height:1.65;color:var(--text-dim);">
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🎯 Цель</div>
+        Выучить эстонские числа, местоимения, возраст, вопросы и семейную лексику на уровне A1–A2.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📦 Три коробки</div>
+        Каждый навык проходит путь:<br>
+        <span style="color:var(--danger);font-weight:700;">Новый</span> → <span style="color:var(--warning);font-weight:700;">Учу</span> → <span style="color:var(--success);font-weight:700;">Освоен</span><br>
+        Ответь правильно <strong>2 раза подряд</strong> — навык продвигается. Одна ошибка — возврат в «Новый».
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔢 8 этапов</div>
+        <strong>1–4:</strong> числа (1–5, 6–10, 11–20, 30–100)<br>
+        <strong>5:</strong> местоимения (sul on, tal on, meil on...)<br>
+        <strong>6:</strong> возраст (Ma olen ... aastat vana)<br>
+        <strong>7:</strong> вопросы и отрицания (Kas sul on? / Ei ole)<br>
+        <strong>8:</strong> семья (poeg, tütar, laps)<br>
+        Следующий этап открывается когда <strong>все</strong> навыки текущего освоены.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📝 Типы заданий</div>
+        Новые навыки → больше <strong>выбора из вариантов</strong>.<br>
+        Освоенные → только <strong>ввод и сборка предложений</strong>.
+      </div>
+      <div>
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">💾 Прогресс</div>
+        Сохраняется автоматически. Можно закрыть и продолжить позже.
+      </div>
+    </div>`;
+  $('faqModal').classList.add('show');
+}
+function closeFaq(){$('faqModal').classList.remove('show');}
+
 // ══ DRILL ══
-// ═══════════════════════════════════════════
 let drillTimer=null;
 function openDrill(word,audioText,label,sublabel){
   stopAudio();$('drillOverlay').classList.add('show');const phase=$('drillPhase');
@@ -403,16 +603,14 @@ function openDrill(word,audioText,label,sublabel){
 }
 function closeDrill(){if(drillTimer){clearTimeout(drillTimer);drillTimer=null;}stopAudio();$('drillOverlay').classList.remove('show');$('drillPhase').innerHTML='';}
 
-// ═══════════════════════════════════════════
 // ══ STUDY MODE ══
-// ═══════════════════════════════════════════
 function nums1to10(){return NUMBERS.filter(x=>x.n>=1&&x.n<=10);}
 function nums11to19(){return NUMBERS.filter(x=>x.n>=11&&x.n<=19);}
 function numsTens(){return NUMBERS.filter(x=>x.n>=20);}
 
 function renderStudy(){
   const c=$('studyContent');c.innerHTML='';
-  const tabs=[{id:'tab1',label:'1–10'},{id:'tab2',label:'11–19'},{id:'tab3',label:'20–100'},{id:'tab4',label:'Примеры'}];
+  const tabs=[{id:'tab1',label:'1–10'},{id:'tab2',label:'11–19'},{id:'tab3',label:'20–100'},{id:'tab4',label:'Примеры'},{id:'tab5',label:'Фразы'}];
   const tabBar=document.createElement('div');tabBar.style.cssText='display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
   const panels={};
   tabs.forEach((tab,i)=>{
@@ -420,6 +618,7 @@ function renderStudy(){
     btn.addEventListener('click',()=>{stopAudio();tabBar.querySelectorAll('.study-tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');Object.values(panels).forEach(p=>p.style.display='none');panels[tab.id].style.display='';});
     tabBar.appendChild(btn);const panel=document.createElement('div');panel.style.display=i===0?'':'none';panels[tab.id]=panel;});
   c.appendChild(tabBar);Object.values(panels).forEach(p=>c.appendChild(p));
+
   function makeCard(num,showOrd){const card=document.createElement('div');card.className='study-card';card.innerHTML=`<div class="sc-num">${num.n}</div><div class="sc-et">${num.et}</div><div class="sc-ru">${num.ru}</div>${showOrd&&num.ord?`<div class="sc-ord">${num.ord} (${num.ordRu})</div>`:''}`;card.addEventListener('click',()=>openDrill(num.et,num.et,String(num.n),num.ru));if(showOrd&&num.ord)card.addEventListener('contextmenu',e=>{e.preventDefault();openDrill(num.ord,num.ord,`${num.n}-й`,num.ordRu);});return card;}
   function makeSentenceRow(num,noun){const s=makeSentence(num,noun);const row=document.createElement('div');row.className='study-sentence';row.innerHTML=`<span class="ss-et">${s.et}</span><span class="ss-ru">${s.ru}</span>`;row.addEventListener('click',()=>openDrill(s.et,s.et,s.ru,''));return row;}
 
@@ -435,55 +634,30 @@ function renderStudy(){
   const p4=panels['tab4'];const n4=document.createElement('div');n4.className='study-note';n4.innerHTML=`<strong>Правило:</strong> после <strong>1</strong> — именительный падеж (õun, koer, raamat, kass). После <strong>2+</strong> — партитив (õun<strong>a</strong>, koer<strong>a</strong>, raamat<strong>ut</strong>, kass<strong>i</strong>)`;p4.appendChild(n4);
   const sw=document.createElement('div');sw.className='study-sentence-grid';
   [{n:1,noun:NOUNS[0]},{n:3,noun:NOUNS[0]},{n:1,noun:NOUNS[2]},{n:5,noun:NOUNS[2]},{n:1,noun:NOUNS[1]},{n:7,noun:NOUNS[1]},{n:1,noun:NOUNS[3]},{n:12,noun:NOUNS[3]}].forEach(({n,noun})=>sw.appendChild(makeSentenceRow(getNum(n),noun)));p4.appendChild(sw);
+
+  // Tab 5: Phrases reference
+  const p5=panels['tab5'];
+  function makePatternSection(title, patterns){
+    const sec=document.createElement('div');sec.style.marginBottom='20px';
+    const heading=document.createElement('div');heading.className='study-note';heading.style.cssText='margin-bottom:10px;padding:10px 14px;';heading.innerHTML=`<strong>${title}</strong>`;
+    sec.appendChild(heading);
+    const grid=document.createElement('div');grid.className='study-sentence-grid';
+    patterns.forEach(p=>{
+      const row=document.createElement('div');row.className='study-sentence';
+      row.innerHTML=`<span class="ss-et">${p.et}</span><span class="ss-ru">${p.ru}</span>`;
+      row.addEventListener('click',()=>openDrill(p.et,p.et,p.ru,''));
+      grid.appendChild(row);
+    });
+    sec.appendChild(grid);return sec;
+  }
+  p5.appendChild(makePatternSection('🗣 Местоимения (Stage 5)', PRONOUN_PATTERNS));
+  p5.appendChild(makePatternSection('🎂 Возраст (Stage 6)', AGE_PATTERNS));
+  p5.appendChild(makePatternSection('❓ Вопросы и ответы (Stage 7)', QA_PATTERNS));
+  p5.appendChild(makePatternSection('👨‍👩‍👧‍👦 Семья (Stage 8)', FAMILY_PATTERNS));
 }
 function openStudy(){renderStudy();showScr('studyScreen');}
 
-// ═══════════════════════════════════════════
-// ══ FAQ ══
-// ═══════════════════════════════════════════
-function openFaq(){
-  $('faqContent').innerHTML = `
-    <div style="font-size:.88rem;line-height:1.65;color:var(--text-dim);">
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🎯 Цель</div>
-        Выучить эстонские числа от 1 до 100 — написание, произношение, порядковые формы и использование в предложениях.
-      </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📦 Три коробки</div>
-        Каждый навык проходит путь:<br>
-        <span style="color:var(--danger);font-weight:700;">Новый</span> → <span style="color:var(--warning);font-weight:700;">Учу</span> → <span style="color:var(--success);font-weight:700;">Освоен</span><br>
-        Ответь правильно <strong>2 раза подряд</strong> — навык переходит в следующую коробку. Одна ошибка — возврат в «Новый».
-      </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔢 4 этапа</div>
-        <strong>Stage 1:</strong> числа 1–5 (15 навыков)<br>
-        <strong>Stage 2:</strong> числа 6–10 (15 навыков)<br>
-        <strong>Stage 3:</strong> числа 11–20 (29 навыков)<br>
-        <strong>Stage 4:</strong> десятки 30–100 (16 навыков)<br>
-        Следующий этап открывается только когда <strong>все</strong> навыки текущего освоены.
-      </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📝 Типы заданий</div>
-        Новые навыки → больше <strong>выбора из вариантов</strong> (помогаем запомнить).<br>
-        Освоенные навыки → только <strong>ввод и диктант</strong> (проверяем что знаешь).
-      </div>
-      <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔊 Справочник</div>
-        Нажми «Изучить числа» — откроются карточки. Клик по карточке запускает мини-дрил: посмотри → запомни → напиши 3 раза.
-      </div>
-      <div>
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">💾 Прогресс</div>
-        Сохраняется автоматически в браузере. Можно закрыть вкладку и продолжить позже.
-      </div>
-    </div>`;
-  $('faqModal').classList.add('show');
-}
-
-function closeFaq(){ $('faqModal').classList.remove('show'); }
-
-// ═══════════════════════════════════════════
 // ══ EVENTS ══
-// ═══════════════════════════════════════════
 function bindEvents(){
   $('startBtn').addEventListener('click',()=>startGame());
   $('studyBtn').addEventListener('click',openStudy);
@@ -511,7 +685,12 @@ function bindEvents(){
 function init(){
   initSkills();
   const save=loadProgress();
-  if(save){skillState=save.skillState;currentStage=save.currentStage||1;}
+  if(save){skillState=save.skillState;currentStage=save.currentStage||1;
+    // Ensure new skills exist
+    Object.entries(PATTERN_MAP).forEach(([type,patterns])=>{
+      patterns.forEach((_,i)=>{ const k=`${type}_${i}`; if(!skillState[k]) skillState[k]=makeSkill(); });
+    });
+  }
   bindEvents();renderStartScreen();
 }
 init();
