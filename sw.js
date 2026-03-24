@@ -1,5 +1,5 @@
-const CACHE_NAME = 'numbrid-v6';
-const STATIC = ['./', './index.html', './styles.css', './app.js', './manifest.json'];
+const CACHE_NAME = 'numbrid-v7';
+const STATIC = ['./', './index.html', './styles.css', './engine.js', './data.js', './manifest.json'];
 
 // Generate audio file list
 const nums = [
