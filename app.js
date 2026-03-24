@@ -552,31 +552,37 @@ function openFaq(){
     <div style="font-size:.88rem;line-height:1.65;color:var(--text-dim);">
       <div style="margin-bottom:14px;">
         <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🎯 Цель</div>
-        Выучить эстонские числа, местоимения, возраст, вопросы и семейную лексику на уровне A1–A2.
+        Научиться использовать эстонские числа в живой речи — считать, говорить о возрасте, задавать вопросы, отвечать, рассказывать о семье. Уровень A1–A2.
       </div>
       <div style="margin-bottom:14px;">
-        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📦 Три коробки</div>
-        Каждый навык проходит путь:<br>
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📦 Как учим</div>
+        Каждая фраза или число — это навык. Навык проходит три ступени:<br>
         <span style="color:var(--danger);font-weight:700;">Новый</span> → <span style="color:var(--warning);font-weight:700;">Учу</span> → <span style="color:var(--success);font-weight:700;">Освоен</span><br>
-        Ответь правильно <strong>2 раза подряд</strong> — навык продвигается. Одна ошибка — возврат в «Новый».
+        <strong>2 верных ответа подряд</strong> — навык идёт вперёд.<br>
+        <strong>1 ошибка</strong> — возврат в начало. Жёстко, но эффективно.
       </div>
       <div style="margin-bottom:14px;">
         <div style="font-weight:800;color:var(--text);margin-bottom:4px;">🔢 8 этапов</div>
-        <strong>1–4:</strong> числа (1–5, 6–10, 11–20, 30–100)<br>
-        <strong>5:</strong> местоимения (sul on, tal on, meil on...)<br>
-        <strong>6:</strong> возраст (Ma olen ... aastat vana)<br>
-        <strong>7:</strong> вопросы и отрицания (Kas sul on? / Ei ole)<br>
-        <strong>8:</strong> семья (poeg, tütar, laps)<br>
-        Следующий этап открывается когда <strong>все</strong> навыки текущего освоены.
+        <strong>1–4:</strong> Числа от 1 до 100 — написание, порядковые, предложения с «Mul on»<br>
+        <strong>5:</strong> Местоимения — sul on, tal on, meil on, teil on, neil on<br>
+        <strong>6:</strong> Возраст — Ma olen ... aastat vana, Kui vana sa oled?<br>
+        <strong>7:</strong> Вопросы — Kas sul on kaks koera? Jah / Ei + отрицания с числами<br>
+        <strong>8:</strong> Семья — poeg, tütar, laps, Kas sul on lapsi?<br><br>
+        Каждый следующий этап открывается когда <strong>все</strong> навыки текущего освоены.
       </div>
       <div style="margin-bottom:14px;">
         <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📝 Типы заданий</div>
-        Новые навыки → больше <strong>выбора из вариантов</strong>.<br>
-        Освоенные → только <strong>ввод и сборка предложений</strong>.
+        Для новых навыков — <strong>выбор из вариантов</strong> (помогаем запомнить).<br>
+        Для продвинутых — <strong>сборка предложения</strong> из слов и <strong>ввод с клавиатуры</strong> (проверяем что реально знаешь).<br>
+        Для чисел — ещё и <strong>аудио-диктант</strong>.
+      </div>
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:800;color:var(--text);margin-bottom:4px;">📖 Справочник</div>
+        Кнопка «Изучить числа» — карточки всех чисел и фраз по этапам. Нажми на любую карточку — откроется мини-дрил: посмотри → запомни → напиши 3 раза.
       </div>
       <div>
         <div style="font-weight:800;color:var(--text);margin-bottom:4px;">💾 Прогресс</div>
-        Сохраняется автоматически. Можно закрыть и продолжить позже.
+        Сохраняется автоматически в браузере. Можно закрыть вкладку и вернуться в любой момент — всё на месте.
       </div>
     </div>`;
   $('faqModal').classList.add('show');
