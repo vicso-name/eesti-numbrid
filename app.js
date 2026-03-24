@@ -619,7 +619,7 @@ function numsTens(){return NUMBERS.filter(x=>x.n>=20);}
 function renderStudy(){
   const c=$('studyContent');c.innerHTML='';
   const tabs=[{id:'tab1',label:'1–10'},{id:'tab2',label:'11–19'},{id:'tab3',label:'20–100'},{id:'tab4',label:'Примеры'},{id:'tab5',label:'Фразы'}];
-  const tabBar=document.createElement('div');tabBar.style.cssText='display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
+  const tabBar=document.createElement('div');tabBar.style.cssText='display:flex;justify-content:space-between;gap:6px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;';
   const panels={};
   tabs.forEach((tab,i)=>{
     const btn=document.createElement('button');btn.className='study-tab';btn.textContent=tab.label;if(i===0)btn.classList.add('active');
