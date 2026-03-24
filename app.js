@@ -77,16 +77,18 @@ const AGE_PATTERNS = [
 ];
 
 const QA_PATTERNS = [
-  {et:'Kas sul on koer', ru:'У тебя есть собака?', words:['Kas','sul','on','koer']},
-  {et:'Jah, mul on koer', ru:'Да, у меня есть собака', words:['Jah','mul','on','koer']},
-  {et:'Kas sul on kass', ru:'У тебя есть кошка?', words:['Kas','sul','on','kass']},
-  {et:'Ei, mul ei ole kassi', ru:'Нет, у меня нет кошки', words:['Ei','mul','ei','ole','kassi']},
-  {et:'Kas tal on auto', ru:'У него есть машина?', words:['Kas','tal','on','auto']},
-  {et:'Jah, tal on auto', ru:'Да, у него есть машина', words:['Jah','tal','on','auto']},
-  {et:'Mul ei ole autot', ru:'У меня нет машины', words:['Mul','ei','ole','autot']},
-  {et:'Mul ei ole koera', ru:'У меня нет собаки', words:['Mul','ei','ole','koera']},
-  {et:'Tal ei ole kassi', ru:'У него нет кошки', words:['Tal','ei','ole','kassi']},
-  {et:'Kas teil on raamat', ru:'У вас есть книга?', words:['Kas','teil','on','raamat']},
+  {et:'Kas sul on kaks koera', ru:'У тебя есть две собаки?', words:['Kas','sul','on','kaks','koera']},
+  {et:'Jah, mul on kaks koera', ru:'Да, у меня две собаки', words:['Jah','mul','on','kaks','koera']},
+  {et:'Kas sul on kolm kassi', ru:'У тебя есть три кошки?', words:['Kas','sul','on','kolm','kassi']},
+  {et:'Ei, mul ei ole kassi aga mul on üks koer', ru:'Нет, у меня нет кошек, но у меня одна собака', words:['Ei','mul','ei','ole','kassi','aga','mul','on','üks','koer']},
+  {et:'Kas tal on viis raamatut', ru:'У него есть пять книг?', words:['Kas','tal','on','viis','raamatut']},
+  {et:'Jah, tal on viis raamatut', ru:'Да, у него пять книг', words:['Jah','tal','on','viis','raamatut']},
+  {et:'Mul ei ole ühtegi koera', ru:'У меня нет ни одной собаки', words:['Mul','ei','ole','ühtegi','koera']},
+  {et:'Kas teil on neli õuna', ru:'У вас есть четыре яблока?', words:['Kas','teil','on','neli','õuna']},
+  {et:'Jah, meil on neli õuna', ru:'Да, у нас четыре яблока', words:['Jah','meil','on','neli','õuna']},
+  {et:'Ei, mul ei ole raamatut aga mul on kaks õuna', ru:'Нет, у меня нет книги, но у меня два яблока', words:['Ei','mul','ei','ole','raamatut','aga','mul','on','kaks','õuna']},
+  {et:'Kas neil on seitse kassi', ru:'У них есть семь кошек?', words:['Kas','neil','on','seitse','kassi']},
+  {et:'Jah, neil on seitse kassi', ru:'Да, у них семь кошек', words:['Jah','neil','on','seitse','kassi']},
 ];
 
 const FAMILY_PATTERNS = [
